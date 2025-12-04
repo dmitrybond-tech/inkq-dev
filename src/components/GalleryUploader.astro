@@ -1,0 +1,682 @@
+---
+import type { I18nSchema } from '../i18n/types';
+import { getApiUrl } from '../shared/config';
+
+interface GalleryItem {
+  id: number;
+  url: string;
+  width: number;
+  height: number;
+  title?: string | null;
+  description?: string | null;
+  approx_price?: string | null;
+  placement?: string | null;
+}
+
+interface Props {
+  role: 'artist' | 'studio' | 'model';
+  initialItems?: GalleryItem[];
+  t: I18nSchema;
+  maxItems?: number;
+  kind?: 'portfolio' | 'wannado';
+  onUpdate?: (items: GalleryItem[]) => void;
+}
+
+const { role, initialItems = [], t, maxItems, kind = 'portfolio', onUpdate } = Astro.props;
+const apiUrl = getApiUrl();
+
+// For artists and studios we use the shared portfolio endpoints.
+// For models we use dedicated gallery endpoints to mirror backend structure.
+const uploadEndpoint =
+  role === 'model'
+    ? `${apiUrl}/api/v1/media/models/me/gallery`
+    : `${apiUrl}/api/v1/media/${role}s/me/portfolio`;
+const listEndpointBase =
+  role === 'model'
+    ? `${apiUrl}/api/v1/media/models/me/gallery`
+    : `${apiUrl}/api/v1/media/${role}s/me/portfolio`;
+const deleteEndpointBase =
+  role === 'model'
+    ? `${apiUrl}/api/v1/media/models/me/gallery`
+    : `${apiUrl}/api/v1/media/portfolio`;
+const patchEndpointBase =
+  role === 'model'
+    ? null
+    : `${apiUrl}/api/v1/media/portfolio`;
+const uniqueId = `gallery-uploader-${Math.random().toString(36).substr(2, 9)}`;
+
+// Helper to build list endpoint with kind query param for artists/studios
+function buildListEndpoint() {
+  if (role === 'model') {
+    return listEndpointBase;
+  }
+  // For artists/studios, append ?kind=portfolio|wannado if kind is set
+  if (kind && (kind === 'portfolio' || kind === 'wannado')) {
+    return `${listEndpointBase}?kind=${kind}`;
+  }
+  return listEndpointBase;
+}
+
+const listEndpoint = buildListEndpoint();
+---
+
+<div class="gallery-uploader" data-uploader-id={uniqueId}>
+  <!-- Drag & drop area -->
+  <div
+    id={`${uniqueId}-dropzone`}
+    class="border-2 border-dashed border-[var(--inkq-border)] rounded-lg p-8 text-center hover:border-[var(--inkq-fg)] transition-colors cursor-pointer bg-[var(--inkq-bg-subtle)]"
+  >
+    <input
+      type="file"
+      id={`${uniqueId}-input`}
+      accept="image/jpeg,image/jpg,image/png,image/webp"
+      multiple
+      class="hidden"
+    />
+    <p class="text-[var(--inkq-muted)] mb-2">{t.media.dragDrop}</p>
+    <button
+      type="button"
+      id={`${uniqueId}-button`}
+      class="px-4 py-2 bg-[var(--inkq-fg)] text-[var(--inkq-bg)] rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
+    >
+      {t.media.addImages}
+    </button>
+    <p class="text-xs text-[var(--inkq-muted)] mt-2">{t.media.supportedFormats}</p>
+  </div>
+
+  <!-- Error message -->
+  <div
+    id={`${uniqueId}-error`}
+    class="text-red-500 text-sm mt-2 hidden"
+  ></div>
+
+  <!-- Loading indicator -->
+  <div
+    id={`${uniqueId}-loading`}
+    class="text-[var(--inkq-muted)] text-sm mt-2 hidden"
+  >
+    {t.media.uploading}
+  </div>
+
+  <!-- Gallery grid -->
+  <div id={`${uniqueId}-grid`} class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+    {initialItems.length === 0 && (
+      <p class="col-span-full text-center text-[var(--inkq-muted)]">{t.media.noImages}</p>
+    )}
+  </div>
+
+  <!-- Edit Modal -->
+  <div
+    id={`${uniqueId}-edit-modal`}
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity"
+  >
+    <div
+      class="bg-[var(--inkq-surface)] rounded-lg p-6 max-w-md w-full mx-4 border border-[var(--inkq-border)] max-h-[90vh] overflow-y-auto"
+      onclick="event.stopPropagation()"
+    >
+      <h3 class="text-lg font-semibold text-[var(--inkq-fg)] mb-4">{t.media.imageEdit}</h3>
+      
+      <div class="space-y-4">
+        <div>
+          <label for={`${uniqueId}-field-title`} class="block text-sm font-medium text-[var(--inkq-fg)] mb-1">
+            {t.media.imageTitleLabel}
+          </label>
+          <input
+            type="text"
+            id={`${uniqueId}-field-title`}
+            class="w-full px-3 py-2 border border-[var(--inkq-border)] rounded-md bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            placeholder={t.media.imageTitleLabel}
+          />
+        </div>
+
+        <div>
+          <label for={`${uniqueId}-field-approx-price`} class="block text-sm font-medium text-[var(--inkq-fg)] mb-1">
+            {t.media.imageApproxPriceLabel}
+          </label>
+          <input
+            type="text"
+            id={`${uniqueId}-field-approx-price`}
+            class="w-full px-3 py-2 border border-[var(--inkq-border)] rounded-md bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            placeholder={t.media.imageApproxPricePlaceholder}
+          />
+        </div>
+
+        <div>
+          <label for={`${uniqueId}-field-placement`} class="block text-sm font-medium text-[var(--inkq-fg)] mb-1">
+            {t.media.imagePlacementLabel}
+          </label>
+          <input
+            type="text"
+            id={`${uniqueId}-field-placement`}
+            class="w-full px-3 py-2 border border-[var(--inkq-border)] rounded-md bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            placeholder={t.media.imagePlacementLabel}
+          />
+        </div>
+
+        <div>
+          <label for={`${uniqueId}-field-description`} class="block text-sm font-medium text-[var(--inkq-fg)] mb-1">
+            {t.media.imageDescriptionLabel}
+          </label>
+          <textarea
+            id={`${uniqueId}-field-description`}
+            rows="4"
+            class="w-full px-3 py-2 border border-[var(--inkq-border)] rounded-md bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)] resize-none"
+            placeholder={t.media.imageDescriptionLabel}
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="flex gap-2 mt-6">
+        <button
+          type="button"
+          id={`${uniqueId}-edit-cancel`}
+          class="flex-1 px-4 py-2 border border-[var(--inkq-border)] rounded-md text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+        >
+          {t.media.imageCancel}
+        </button>
+        <button
+          type="button"
+          id={`${uniqueId}-edit-save`}
+          class="flex-1 px-4 py-2 bg-[var(--inkq-fg)] text-[var(--inkq-bg)] rounded-md hover:opacity-90 transition-opacity"
+        >
+          {t.media.imageSave}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ uploadEndpoint, listEndpoint, deleteEndpointBase, patchEndpointBase, uniqueId, maxItems, kind, onUpdate, t, initialItems, role }}>
+  // Gallery items with metadata support
+  let items = initialItems && Array.isArray(initialItems) ? [...initialItems] : [];
+  let editingItemId = null;
+
+  const dropzone = document.getElementById(`${uniqueId}-dropzone`);
+  const input = document.getElementById(`${uniqueId}-input`);
+  const button = document.getElementById(`${uniqueId}-button`);
+  const grid = document.getElementById(`${uniqueId}-grid`);
+  const errorDiv = document.getElementById(`${uniqueId}-error`);
+  const loadingDiv = document.getElementById(`${uniqueId}-loading`);
+  
+  // Edit modal elements
+  const editModal = document.getElementById(`${uniqueId}-edit-modal`);
+  const editTitleInput = document.getElementById(`${uniqueId}-field-title`);
+  const editApproxPriceInput = document.getElementById(`${uniqueId}-field-approx-price`);
+  const editPlacementInput = document.getElementById(`${uniqueId}-field-placement`);
+  const editDescriptionInput = document.getElementById(`${uniqueId}-field-description`);
+  const editSaveBtn = document.getElementById(`${uniqueId}-edit-save`);
+  const editCancelBtn = document.getElementById(`${uniqueId}-edit-cancel`);
+
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+    if (!cookie) return null;
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+    return { headers: base, token };
+  }
+
+  function isAuthError(response, errorData) {
+    return response.status === 401 ||
+      (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+  }
+
+  function getSessionErrorMessage() {
+    const lang = document.documentElement.lang || 'en';
+    return lang === 'ru'
+      ? 'Сессия истекла. Пожалуйста, войдите снова.'
+      : 'Session expired. Please sign in again.';
+  }
+
+  // Load initial items
+  async function loadItems() {
+    const { headers, token } = buildAuthHeaders();
+    
+    if (!token) {
+      if (items.length > 0) {
+        renderGrid();
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(listEndpoint, {
+        headers,
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const serverItems = (data && data.items) || [];
+        // Map server items including metadata
+        items = serverItems.map((item) => ({
+          id: item.id,
+          url: item.url || item.image_url,
+          width: item.width || 0,
+          height: item.height || 0,
+          title: item.title || null,
+          description: item.description || null,
+          approx_price: item.approx_price || null,
+          placement: item.placement || null,
+        }));
+        renderGrid();
+        if (onUpdate) {
+          onUpdate(items);
+        }
+        hideError();
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to load portfolio' }));
+        if (isAuthError(response, errorData)) {
+          if (items.length === 0) {
+            showError(getSessionErrorMessage());
+          }
+        } else {
+          const errorMsg = errorData.detail || t.media.uploadError;
+          if (errorMsg && !errorMsg.includes('authorization') && !errorMsg.includes('Session')) {
+            showError(errorMsg);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load portfolio:', error);
+    }
+  }
+
+  function showError(message) {
+    if (errorDiv) {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('hidden');
+    }
+    if (loadingDiv) {
+      loadingDiv.classList.add('hidden');
+    }
+  }
+
+  function hideError() {
+    if (errorDiv) {
+      errorDiv.classList.add('hidden');
+    }
+  }
+
+  function showLoading() {
+    if (loadingDiv) {
+      loadingDiv.classList.remove('hidden');
+    }
+    hideError();
+  }
+
+  function hideLoading() {
+    if (loadingDiv) {
+      loadingDiv.classList.add('hidden');
+    }
+  }
+
+  function openEditModal(itemId) {
+    const item = items.find((i) => i.id === itemId);
+    if (!item || !editModal || !editTitleInput || !editApproxPriceInput || !editPlacementInput || !editDescriptionInput) {
+      return;
+    }
+
+    editingItemId = itemId;
+    editTitleInput.value = item.title || '';
+    editApproxPriceInput.value = item.approx_price || '';
+    editPlacementInput.value = item.placement || '';
+    editDescriptionInput.value = item.description || '';
+
+    editModal.classList.remove('pointer-events-none');
+    editModal.classList.add('opacity-100');
+  }
+
+  function closeEditModal() {
+    if (!editModal) return;
+    editModal.classList.add('pointer-events-none');
+    editModal.classList.remove('opacity-100');
+    editingItemId = null;
+    
+    if (editTitleInput) editTitleInput.value = '';
+    if (editApproxPriceInput) editApproxPriceInput.value = '';
+    if (editPlacementInput) editPlacementInput.value = '';
+    if (editDescriptionInput) editDescriptionInput.value = '';
+  }
+
+  async function saveEditModal() {
+    if (!editingItemId || !patchEndpointBase) return;
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    
+    if (!token) {
+      showError(getSessionErrorMessage());
+      return;
+    }
+
+    const payload = {};
+    if (editTitleInput && editTitleInput.value.trim()) {
+      payload.title = editTitleInput.value.trim();
+    }
+    if (editApproxPriceInput && editApproxPriceInput.value.trim()) {
+      payload.approx_price = editApproxPriceInput.value.trim();
+    }
+    if (editPlacementInput && editPlacementInput.value.trim()) {
+      payload.placement = editPlacementInput.value.trim();
+    }
+    if (editDescriptionInput && editDescriptionInput.value.trim()) {
+      payload.description = editDescriptionInput.value.trim();
+    }
+
+    try {
+      const response = await fetch(`${patchEndpointBase}/${editingItemId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to update' }));
+        if (isAuthError(response, errorData)) {
+          showError(getSessionErrorMessage());
+        } else {
+          showError(errorData.detail || t.media.uploadError);
+        }
+        return;
+      }
+
+      const updatedItem = await response.json();
+      
+      // Update the item in items array
+      const itemIndex = items.findIndex((i) => i.id === editingItemId);
+      if (itemIndex !== -1) {
+        items[itemIndex] = {
+          ...items[itemIndex],
+          title: updatedItem.title || null,
+          description: updatedItem.description || null,
+          approx_price: updatedItem.approx_price || null,
+          placement: updatedItem.placement || null,
+        };
+      }
+
+      renderGrid();
+      closeEditModal();
+      
+      if (onUpdate) {
+        onUpdate(items);
+      }
+    } catch (error) {
+      showError((error && error.message) || t.media.uploadError);
+    }
+  }
+
+  function renderGrid() {
+    if (!grid) return;
+
+    if (items.length === 0) {
+      grid.innerHTML = `<p class="col-span-full text-center text-[var(--inkq-muted)]">${t.media.noImages}</p>`;
+      return;
+    }
+
+    const showEditButton = role === 'artist' && patchEndpointBase;
+
+    grid.innerHTML = items.map((item) => {
+      const aspectRatio = item.width / item.height;
+      return `
+        <div class="relative group aspect-square overflow-hidden rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]">
+          <img
+            src="${item.url}"
+            alt="Portfolio image"
+            class="w-full h-full object-cover"
+            style="aspect-ratio: ${aspectRatio}"
+          />
+          <div class="absolute top-2 right-2 flex gap-1">
+            ${showEditButton ? `
+              <button
+                data-edit-item-id="${item.id}"
+                class="bg-blue-500 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="${t.media.imageEdit}"
+              >
+                ${t.media.imageEdit}
+              </button>
+            ` : ''}
+            <button
+              data-item-id="${item.id}"
+              class="bg-red-500 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="${t.media.delete}"
+            >
+              ${t.media.remove}
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach delete handlers
+    grid.querySelectorAll('[data-item-id]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const target = e.target;
+        const idAttr = target && target.getAttribute ? target.getAttribute('data-item-id') : '0';
+        const itemId = parseInt(idAttr || '0', 10);
+        await deleteItem(itemId);
+      });
+    });
+
+    // Attach edit handlers
+    if (showEditButton) {
+      grid.querySelectorAll('[data-edit-item-id]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const target = e.target;
+          const idAttr = target && target.getAttribute ? target.getAttribute('data-edit-item-id') : '0';
+          const itemId = parseInt(idAttr || '0', 10);
+          openEditModal(itemId);
+        });
+      });
+    }
+  }
+
+  async function deleteItem(itemId) {
+    if (!confirm(t.media.deleteConfirm)) {
+      return;
+    }
+
+    const { headers, token } = buildAuthHeaders();
+    
+    if (!token) {
+      showError(getSessionErrorMessage());
+      return;
+    }
+
+    try {
+      const response = await fetch(`${deleteEndpointBase}/${itemId}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: t.media.uploadError }));
+        if (isAuthError(response, errorData)) {
+          showError(getSessionErrorMessage());
+        } else {
+          showError(errorData.detail || t.media.uploadError);
+        }
+        return;
+      }
+
+      items = items.filter((item) => item.id !== itemId);
+      renderGrid();
+      if (onUpdate) {
+        onUpdate(items);
+      }
+    } catch (error) {
+      showError((error && error.message) || t.media.uploadError);
+    }
+  }
+
+  async function uploadFiles(files) {
+    const fileArray = Array.from(files || []);
+
+    if (maxItems && items.length + fileArray.length > maxItems) {
+      showError(`Maximum ${maxItems} images allowed`);
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    for (const file of fileArray) {
+      if (!allowedTypes.includes(file.type)) {
+        showError(`${file.name}: ${t.media.invalidFileType}`);
+        return;
+      }
+      if (file.size > maxSize) {
+        showError(`${file.name}: ${t.media.fileTooLarge}`);
+        return;
+      }
+    }
+
+    const { headers, token } = buildAuthHeaders();
+    
+    if (!token) {
+      showError(getSessionErrorMessage());
+      return;
+    }
+
+    showLoading();
+
+    const formData = new FormData();
+    fileArray.forEach((file) => {
+      formData.append('files', file);
+    });
+    formData.append('kind', kind);
+
+    try {
+      const response = await fetch(uploadEndpoint, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
+        if (isAuthError(response, errorData)) {
+          showError(getSessionErrorMessage());
+        } else {
+          showError(errorData.detail || t.media.uploadError);
+        }
+        hideLoading();
+        return;
+      }
+
+      const data = await response.json();
+      const serverItems = (data && data.items) || [];
+      const newItems = serverItems.map((item) => ({
+        id: item.id,
+        url: item.url || item.image_url,
+        width: item.width || 0,
+        height: item.height || 0,
+        title: item.title || null,
+        description: item.description || null,
+        approx_price: item.approx_price || null,
+        placement: item.placement || null,
+      }));
+      items = [...items, ...newItems];
+      renderGrid();
+      hideLoading();
+      hideError();
+
+      if (onUpdate) {
+        onUpdate(items);
+      }
+    } catch (error) {
+      showError((error && error.message) || t.media.uploadError);
+      hideLoading();
+    }
+  }
+
+  // Event listeners
+  if (button && input) {
+    button.addEventListener('click', () => {
+      if (typeof input.click === 'function') {
+        input.click();
+      }
+    });
+
+    input.addEventListener('change', (e) => {
+      const target = e.target;
+      const files = target && 'files' in target ? target.files : null;
+      if (files) {
+        uploadFiles(files);
+        target.value = '';
+      }
+    });
+  }
+
+  if (dropzone) {
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('border-[var(--inkq-fg)]');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('border-[var(--inkq-fg)]');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('border-[var(--inkq-fg)]');
+      const dt = e.dataTransfer;
+      if (dt && dt.files) {
+        uploadFiles(dt.files);
+      }
+    });
+
+    dropzone.addEventListener('click', () => {
+      if (input && typeof input.click === 'function') {
+        input.click();
+      }
+    });
+  }
+
+  // Modal event listeners
+  if (editCancelBtn) {
+    editCancelBtn.addEventListener('click', closeEditModal);
+  }
+
+  if (editSaveBtn) {
+    editSaveBtn.addEventListener('click', saveEditModal);
+  }
+
+  if (editModal) {
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) {
+        closeEditModal();
+      }
+    });
+  }
+
+  // Render initial items immediately if available
+  if (items.length > 0) {
+    renderGrid();
+  }
+
+  // Then attempt to load fresh items from API (will update if successful)
+  loadItems();
+</script>

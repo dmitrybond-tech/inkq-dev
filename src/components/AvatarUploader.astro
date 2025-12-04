@@ -1,0 +1,246 @@
+---
+import type { I18nSchema } from '../i18n/types';
+import { getApiUrl } from '../shared/config';
+
+interface Props {
+  role: 'artist' | 'studio' | 'model';
+  initialUrl?: string | null;
+  t: I18nSchema;
+  onChange?: (url: string) => void;
+}
+
+const { role, initialUrl, t, onChange } = Astro.props;
+const apiUrl = getApiUrl();
+const uploadEndpoint = `${apiUrl}/api/v1/media/${role}s/me/avatar`;
+const uniqueId = `avatar-uploader-${Math.random().toString(36).substr(2, 9)}`;
+---
+
+<div class="avatar-uploader" data-uploader-id={uniqueId}>
+  <div class="flex flex-col items-center gap-4">
+    <!-- Current avatar preview -->
+    <div class="relative cursor-pointer" id={`${uniqueId}-click-area`}>
+      <img
+        id={`${uniqueId}-preview`}
+        src={initialUrl || '/placeholder-avatar.svg'}
+        alt="Avatar"
+        class="w-32 h-32 rounded-full object-cover border-2 border-[var(--inkq-border)]"
+        onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect width=%22100%22 height=%22100%22 fill=%22%23ddd%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3ENo image%3C/text%3E%3C/svg%3E'"
+      />
+      {initialUrl && (
+        <div class="absolute inset-0 rounded-full bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+          <span class="text-white text-sm opacity-0 hover:opacity-100">{t.media.avatarUpload}</span>
+        </div>
+      )}
+    </div>
+    
+    <!-- File input -->
+    <div class="flex flex-col items-center gap-2">
+      <input
+        type="file"
+        id={`${uniqueId}-input`}
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        class="hidden"
+      />
+      <button
+        type="button"
+        id={`${uniqueId}-button`}
+        class="px-4 py-2 bg-[var(--inkq-fg)] text-[var(--inkq-bg)] rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
+      >
+        {t.media.selectFile}
+      </button>
+      <p class="text-xs text-[var(--inkq-muted)] text-center max-w-xs">
+        {t.media.supportedFormats}
+      </p>
+    </div>
+    
+    <!-- Error message -->
+    <div
+      id={`${uniqueId}-error`}
+      class="text-red-500 text-sm hidden"
+    ></div>
+    
+    <!-- Loading indicator -->
+    <div
+      id={`${uniqueId}-loading`}
+      class="text-[var(--inkq-muted)] text-sm hidden"
+    >
+      {t.media.uploading}
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ uploadEndpoint, uniqueId, onChange, t }}>
+  const input = document.getElementById(`${uniqueId}-input`);
+  const button = document.getElementById(`${uniqueId}-button`);
+  const preview = document.getElementById(`${uniqueId}-preview`);
+  const errorDiv = document.getElementById(`${uniqueId}-error`);
+  const loadingDiv = document.getElementById(`${uniqueId}-loading`);
+  const clickArea = document.getElementById(`${uniqueId}-click-area`);
+
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+    if (!cookie) return null;
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+    return { headers: base, token };
+  }
+
+  function isAuthError(response, errorData) {
+    return response.status === 401 ||
+      (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+  }
+
+  function getSessionErrorMessage() {
+    const lang = document.documentElement.lang || 'en';
+    return lang === 'ru'
+      ? 'Сессия истекла. Пожалуйста, войдите снова.'
+      : 'Session expired. Please sign in again.';
+  }
+
+  function showError(message) {
+    if (errorDiv) {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('hidden');
+    }
+    if (loadingDiv) {
+      loadingDiv.classList.add('hidden');
+    }
+  }
+
+  function hideError() {
+    if (errorDiv) {
+      errorDiv.classList.add('hidden');
+    }
+  }
+
+  function showLoading() {
+    if (loadingDiv) {
+      loadingDiv.classList.remove('hidden');
+    }
+    hideError();
+  }
+
+  function hideLoading() {
+    if (loadingDiv) {
+      loadingDiv.classList.add('hidden');
+    }
+  }
+
+  async function uploadFile(file) {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showError(t.media.invalidFileType);
+      return;
+    }
+
+    // Validate file size (10MB default)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      showError(t.media.fileTooLarge);
+      return;
+    }
+
+    const { headers, token } = buildAuthHeaders();
+    
+    if (!token) {
+      showError(getSessionErrorMessage());
+      return;
+    }
+
+    // Show preview
+    const previewUrl = URL.createObjectURL(file);
+    if (preview) {
+      preview.src = previewUrl;
+    }
+
+    showLoading();
+
+    // Upload
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(uploadEndpoint, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
+        if (isAuthError(response, errorData)) {
+          showError(getSessionErrorMessage());
+        } else {
+          showError(errorData.detail || t.media.uploadError);
+        }
+        hideLoading();
+        return;
+      }
+
+      const data = await response.json();
+      
+      // Update preview with server URL
+      if (preview) {
+        preview.src = data.url;
+      }
+
+      // Call onChange callback
+      if (onChange) {
+        onChange(data.url);
+      }
+
+      hideLoading();
+      hideError();
+
+      // Revoke object URL
+      URL.revokeObjectURL(previewUrl);
+    } catch (error) {
+      showError(error && error.message ? error.message : t.media.uploadError);
+      hideLoading();
+    }
+  }
+
+  function openFilePicker() {
+    if (input && typeof input.click === 'function') {
+      input.click();
+    }
+  }
+
+  if (button) {
+    button.addEventListener('click', openFilePicker);
+  }
+
+  if (clickArea) {
+    clickArea.addEventListener('click', openFilePicker);
+  }
+
+  if (input) {
+    input.addEventListener('change', (e) => {
+      const target = e.target;
+      const files = target && 'files' in target ? target.files : null;
+      const file = files && files[0] ? files[0] : null;
+      if (file) {
+        uploadFile(file);
+      }
+    });
+  }
+</script>
+

@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+/* Grayscale palette CSS variables */
+:root {
+  --inkq-gray-0: #ffffff;
+  --inkq-gray-1: #f5f5f5;
+  --inkq-gray-2: #e5e5e5;
+  --inkq-gray-3: #d4d4d4;
+  --inkq-gray-4: #a3a3a3;
+  --inkq-gray-5: #737373;
+  --inkq-gray-6: #404040;
+  --inkq-gray-7: #0a0a0a;
+}
+
+/* Light theme */
+html[data-theme='light'] {
+  --inkq-bg: var(--inkq-gray-0);
+  --inkq-bg-subtle: var(--inkq-gray-1);
+  --inkq-surface: var(--inkq-gray-1);
+  --inkq-border: var(--inkq-gray-3);
+  --inkq-fg: var(--inkq-gray-7);
+  --inkq-muted: var(--inkq-gray-4);
+}
+
+/* Dark theme */
+html[data-theme='dark'] {
+  --inkq-bg: var(--inkq-gray-7);
+  --inkq-bg-subtle: var(--inkq-gray-6);
+  --inkq-surface: var(--inkq-gray-6);
+  --inkq-border: var(--inkq-gray-4);
+  --inkq-fg: var(--inkq-gray-0);
+  --inkq-muted: var(--inkq-gray-3);
+}
+
+body {
+  background-color: var(--inkq-bg);
+  color: var(--inkq-fg);
+  transition: background-color 0.2s, color 0.2s;
+}

@@ -1,0 +1,123 @@
+---
+import type { Lang } from '../i18n/types';
+import { supportedLangs } from '../i18n/index';
+
+interface Props {
+  currentLang: Lang;
+  currentPath: string;
+}
+
+const { currentLang, currentPath } = Astro.props;
+
+// Language labels for display in dropdown
+const langLabels: Record<Lang, string> = {
+  en: 'English',
+  ru: 'Русский',
+};
+
+// Generate paths for all supported languages
+const langPaths: Record<Lang, string> = {} as Record<Lang, string>;
+for (const lang of supportedLangs) {
+  const pathSegments = currentPath.split('/').filter(Boolean);
+  if (pathSegments.length > 0 && (pathSegments[0] === 'en' || pathSegments[0] === 'ru')) {
+    pathSegments[0] = lang;
+  } else {
+    pathSegments.unshift(lang);
+  }
+  langPaths[lang] = '/' + pathSegments.join('/');
+}
+---
+
+<details class="relative" id="language-switcher">
+  <summary
+    class="flex items-center justify-center w-9 h-9 rounded-md bg-[var(--inkq-surface)] hover:bg-[var(--inkq-bg-subtle)] border border-[var(--inkq-border)] transition-colors cursor-pointer list-none"
+    aria-label="Select language"
+    aria-haspopup="true"
+  >
+    <!-- Globe icon -->
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="text-[var(--inkq-fg)]"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  </summary>
+  <div class="absolute right-0 mt-2 w-40 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-surface)] shadow-lg py-1 z-20">
+    {supportedLangs.map((lang) => (
+      <a
+        href={langPaths[lang]}
+        class={`block px-4 py-2 text-sm text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors ${
+          lang === currentLang ? 'font-semibold bg-[var(--inkq-bg-subtle)]' : ''
+        }`}
+        aria-label={`Switch to ${langLabels[lang]}`}
+        aria-current={lang === currentLang ? 'true' : undefined}
+      >
+        <span class="flex items-center gap-2">
+          {langLabels[lang]}
+          {lang === currentLang && (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="ml-auto"
+              aria-hidden="true"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </span>
+      </a>
+    ))}
+  </div>
+</details>
+
+<script>
+  // Close dropdown when clicking outside or pressing Escape
+  const languageSwitcher = document.getElementById('language-switcher');
+  if (languageSwitcher) {
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && languageSwitcher.hasAttribute('open')) {
+        languageSwitcher.removeAttribute('open');
+      }
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if (
+        languageSwitcher.hasAttribute('open') &&
+        !languageSwitcher.contains(e.target as Node)
+      ) {
+        languageSwitcher.removeAttribute('open');
+      }
+    });
+  }
+</script>
+
+<style>
+  /* Hide default summary marker */
+  #language-switcher summary::-webkit-details-marker {
+    display: none;
+  }
+  #language-switcher summary::marker {
+    display: none;
+  }
+</style>
+

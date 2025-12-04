@@ -1,0 +1,258 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
+import type { Lang, I18nSchema } from '../../../i18n/types';
+import { callBackendJsonParse } from '../../../shared/api/client';
+
+export const prerender = false;
+
+export async function getStaticPaths() {
+  // Dynamic models – we only predefine languages, username is resolved at runtime.
+  return supportedLangs.map((lang) => ({
+    params: { lang, username: 'placeholder' },
+  }));
+}
+
+interface ModelGalleryItem {
+  id: number;
+  image_url: string;
+  caption?: string | null;
+  created_at: string;
+}
+
+interface PublicModelProfile {
+  username: string;
+  display_name?: string | null;
+  city?: string | null;
+  about?: string | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  gallery: ModelGalleryItem[];
+}
+
+const lang: Lang = resolveLangFromParams(Astro.params.lang);
+const t: I18nSchema = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const slugParam = Astro.params.username as string; // Route param is 'username' but we treat it as slug
+
+let profile: PublicModelProfile | null = null;
+let notFound = false;
+let errorMessage: string | null = null;
+
+try {
+  profile = await callBackendJsonParse<PublicModelProfile>(`/api/v1/public/models/${encodeURIComponent(slugParam)}`);
+} catch (error: any) {
+  if (error?.message === 'Model not found' || error?.message?.includes('not found')) {
+    notFound = true;
+  } else {
+    notFound = true;
+    errorMessage = error?.message || 'Failed to load model';
+  }
+}
+
+if (notFound || !profile) {
+  const message = errorMessage || t.profile.modelNotFound;
+  return new Response(message, {
+    status: 404,
+    statusText: message,
+  });
+}
+
+const title = profile.display_name || profile.username;
+const hasSocial = !!profile.instagram || !!profile.telegram;
+---
+
+<PublicLayout title={title} lang={lang} t={t} currentPath={currentPath}>
+  <section class="mb-8 rounded-lg overflow-hidden border border-[var(--inkq-border)] bg-[var(--inkq-surface)]">
+    <div class="relative">
+      <div class="h-48 md:h-56 w-full overflow-hidden bg-[var(--inkq-bg-subtle)]">
+        <img
+          src={profile.banner_url || '/placeholder-banner.svg'}
+          alt="Banner"
+          class="w-full h-full object-cover"
+        />
+      </div>
+      <div class="absolute -bottom-10 left-6 flex items-end gap-4">
+        <div class="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-[var(--inkq-surface)] bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center text-xl font-semibold text-[var(--inkq-muted)]">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.username}
+              class="w-full h-full object-cover"
+            />
+          ) : (
+            <span>{title.charAt(0).toUpperCase()}</span>
+          )}
+        </div>
+        <div class="pb-2">
+          <h1 class="text-2xl md:text-3xl font-bold text-[var(--inkq-fg)]">
+            {title}
+          </h1>
+          <p class="text-sm text-[var(--inkq-muted)]">
+            {t.profile.roleModel}
+            {profile.city ? ` • ${profile.city}` : ''}
+          </p>
+          <p class="text-xs text-[var(--inkq-muted)] mt-1">
+            @{profile.username}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-14 pb-4 px-6 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-wrap gap-2 text-xs text-[var(--inkq-muted)]">
+        <span>
+          {lang === 'ru'
+            ? 'Публичный профиль модели на InkQ'
+            : 'Public model profile on InkQ'}
+        </span>
+      </div>
+
+      {hasSocial && (
+        <div class="flex flex-wrap gap-3">
+          {profile.instagram && (
+            <a
+              href={profile.instagram.startsWith('http') ? profile.instagram : `https://instagram.com/${profile.instagram.replace('@', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>📸</span>
+              <span>Instagram</span>
+            </a>
+          )}
+          {profile.telegram && (
+            <a
+              href={profile.telegram.startsWith('http') ? profile.telegram : `https://t.me/${profile.telegram.replace('@', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>💬</span>
+              <span>Telegram</span>
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[1.5fr,2fr] gap-8 items-start">
+    <!-- About -->
+    <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)] space-y-3">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.aboutTitle}</h2>
+      {profile.about ? (
+        <p class="text-[var(--inkq-fg)] leading-relaxed whitespace-pre-wrap">
+          {profile.about}
+        </p>
+      ) : (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Модель ещё не заполнила раздел «О себе».'
+            : 'This model has not added an about section yet.'}
+        </p>
+      )}
+      <div class="text-sm text-[var(--inkq-muted)] space-y-1">
+        <p>
+          <strong>{t.profile.cityLabel}:</strong>{' '}
+          {profile.city || (lang === 'ru' ? 'Не указан' : 'Not specified')}
+        </p>
+      </div>
+    </section>
+
+    <!-- Gallery -->
+    <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)] space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'Галерея' : 'Gallery'}
+      </h2>
+      {profile.gallery.length === 0 ? (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Модель ещё не добавила фотографии в галерею.'
+            : 'This model has not added any photos to the gallery yet.'}
+        </p>
+      ) : (
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {profile.gallery.map((item) => (
+            <button
+              type="button"
+              class="relative aspect-square overflow-hidden rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] group"
+              data-lightbox-image={item.image_url}
+            >
+              <img
+                src={item.image_url}
+                alt={item.caption || 'Gallery image'}
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  </div>
+
+  <!-- Lightbox -->
+  <div
+    id="model-lightbox"
+    class="fixed inset-0 bg-black/80 flex items-center justify-center z-40 opacity-0 pointer-events-none transition-opacity"
+  >
+    <button
+      type="button"
+      id="model-lightbox-close"
+      class="absolute top-4 right-4 text-white text-2xl"
+      aria-label="Close"
+    >
+      ×
+    </button>
+    <img
+      id="model-lightbox-image"
+      src=""
+      alt="Preview"
+      class="max-w-full max-h-[80vh] rounded-lg shadow-xl"
+    />
+  </div>
+</PublicLayout>
+
+<script>
+  // Lightbox
+  const lightbox = document.getElementById('model-lightbox');
+  const lightboxImage = document.getElementById('model-lightbox-image');
+  const lightboxClose = document.getElementById('model-lightbox-close');
+
+  function openLightbox(url) {
+    if (!lightbox || !lightboxImage) return;
+    lightboxImage.src = url;
+    lightbox.classList.remove('pointer-events-none');
+    lightbox.classList.add('opacity-100');
+  }
+
+  function closeLightbox() {
+    if (!lightbox || !lightboxImage) return;
+    lightbox.classList.add('pointer-events-none');
+    lightbox.classList.remove('opacity-100');
+    lightboxImage.src = '';
+  }
+
+  document.querySelectorAll('[data-lightbox-image]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const url = el.getAttribute('data-lightbox-image');
+      if (url) openLightbox(url);
+    });
+  });
+
+  if (lightboxClose) {
+    lightboxClose.addEventListener('click', closeLightbox);
+  }
+
+  if (lightbox) {
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+  }
+</script>
+

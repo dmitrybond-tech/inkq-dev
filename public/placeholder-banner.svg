@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200" role="img" aria-labelledby="title desc">
+  <title id="title">Banner placeholder</title>
+  <desc id="desc">Generic banner placeholder</desc>
+  <defs>
+    <linearGradient id="banner-bg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e5e7eb" />
+      <stop offset="100%" stop-color="#d1d5db" />
+    </linearGradient>
+    <pattern id="diagonal-lines" patternUnits="userSpaceOnUse" width="16" height="16">
+      <path d="M0 16L16 0M-4 4L4 -4M12 20L20 12" stroke="#cbd5f5" stroke-width="1" />
+    </pattern>
+  </defs>
+  <rect x="0" y="0" width="800" height="200" fill="url(#banner-bg)" />
+  <rect x="0" y="0" width="800" height="200" fill="url(#diagonal-lines)" opacity="0.3" />
+  <rect x="40" y="50" width="200" height="100" rx="16" fill="#f9fafb" opacity="0.8" />
+  <rect x="280" y="70" width="160" height="16" rx="8" fill="#e5e7eb" />
+  <rect x="280" y="100" width="260" height="12" rx="6" fill="#e5e7eb" />
+</svg>
+
+

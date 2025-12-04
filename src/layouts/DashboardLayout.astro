@@ -1,0 +1,85 @@
+---
+import type { Lang, I18nSchema } from '../i18n/types';
+import Header from '../components/Header.astro';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  lang: Lang;
+  t: I18nSchema;
+  currentPath: string;
+}
+
+const { title = 'InkQ Dashboard', lang, t, currentPath } = Astro.props;
+---
+
+<!doctype html>
+<html lang={lang} data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <script is:inline>
+      // Initialize theme immediately to prevent FOUC
+      (function() {
+        const stored = localStorage.getItem('inkq-theme');
+        const theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+  </head>
+  <body class="bg-[var(--inkq-bg)] text-[var(--inkq-fg)] min-h-screen">
+    <Header lang={lang} t={t} currentPath={currentPath} />
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex gap-8">
+        <!-- Sidebar -->
+        <aside class="w-64 flex-shrink-0">
+          <nav class="bg-[var(--inkq-surface)] rounded-lg p-4 border border-[var(--inkq-border)]">
+            <ul class="space-y-2">
+              <li>
+                <a
+                  href={`/${lang}/dashboard/artist`}
+                  class="block px-3 py-2 rounded-md text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+                >
+                  {t.dashboard.navOverview}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`/${lang}/dashboard/artist`}
+                  class="block px-3 py-2 rounded-md text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+                >
+                  {t.dashboard.navProfile}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`/${lang}/dashboard/artist`}
+                  class="block px-3 py-2 rounded-md text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+                >
+                  {t.dashboard.navCalendar}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`/${lang}/dashboard/artist`}
+                  class="block px-3 py-2 rounded-md text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+                >
+                  {t.dashboard.navSettings}
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1">
+          <slot />
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
+

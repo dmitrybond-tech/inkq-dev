@@ -1,0 +1,265 @@
+---
+import DashboardLayout from '../../../../layouts/DashboardLayout.astro';
+import AvatarUploader from '../../../../components/AvatarUploader.astro';
+import BannerUploader from '../../../../components/BannerUploader.astro';
+import GalleryUploader from '../../../../components/GalleryUploader.astro';
+import StudioProfileForm from '../../../../components/StudioProfileForm.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../../i18n/index';
+import { getApiUrl } from '../../../../shared/config';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const user = Astro.locals.user;
+const sessionToken = Astro.locals.sessionToken;
+const apiUrl = getApiUrl();
+---
+
+<DashboardLayout title={t.onboarding.title} lang={lang} t={t} currentPath={currentPath}>
+  <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)] space-y-6">
+    <header class="flex flex-col gap-2">
+      <h1 class="text-3xl font-bold text-[var(--inkq-fg)]">{t.onboarding.title}</h1>
+      <p class="text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Пройдите эти шаги, чтобы настроить страницу студии и начать получать заявки.'
+          : 'Follow these steps to set up your studio page and start receiving bookings.'}
+      </p>
+      <p class="text-xs text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Онбординг можно завершить позже — данные сохраняются по мере заполнения.'
+          : 'You can finish onboarding later — your data is saved as you go.'}
+      </p>
+    </header>
+
+    <div id="studio-onboarding-message" class="text-sm text-[var(--inkq-muted)]"></div>
+
+    <div class="space-y-8">
+      <!-- Step 1: About & contact -->
+      <section
+        class="flex items-start gap-4 p-6 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+        data-onboarding-step="1"
+      >
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--inkq-fg)] text-[var(--inkq-bg)] flex items-center justify-center font-bold">
+          1
+        </div>
+        <div class="flex-1 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--inkq-fg)]">
+                {lang === 'ru' ? 'О студии и контакты' : 'About & contact'}
+              </h3>
+              <p class="text-sm text-[var(--inkq-muted)]">
+                {lang === 'ru'
+                  ? 'Расскажите о студии, укажите город, адрес и контакты для связи.'
+                  : 'Tell clients about your studio, set city, address and contact links.'}
+              </p>
+            </div>
+            <p class="text-xs text-[var(--inkq-muted)]">Step 1 / 2</p>
+          </div>
+
+          <StudioProfileForm lang={lang} t={t} sessionToken={sessionToken} />
+        </div>
+      </section>
+
+      <!-- Step 2: Visuals & gallery -->
+      <section
+        class="flex items-start gap-4 p-6 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+        data-onboarding-step="2"
+      >
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--inkq-fg)] text-[var(--inkq-bg)] flex items-center justify-center font-bold">
+          2
+        </div>
+        <div class="flex-1 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--inkq-fg)]">
+                {lang === 'ru' ? 'Визуалы и галерея' : 'Visuals & gallery'}
+              </h3>
+              <p class="text-sm text-[var(--inkq-muted)]">
+                {lang === 'ru'
+                  ? 'Загрузите аватар, баннер и фото пространства студии.'
+                  : 'Upload your studio avatar, banner, and photos of the space.'}
+              </p>
+            </div>
+            <p class="text-xs text-[var(--inkq-muted)]">Step 2 / 2</p>
+          </div>
+
+          <div class="space-y-6 mt-2">
+            <div>
+              <h4 class="text-sm font-medium mb-2 text-[var(--inkq-fg)]">{t.media.avatarUpload}</h4>
+              <AvatarUploader role="studio" initialUrl={user?.avatar_url} t={t} />
+            </div>
+            <div>
+              <h4 class="text-sm font-medium mb-2 text-[var(--inkq-fg)]">{t.media.bannerUpload}</h4>
+              <p class="text-xs text-[var(--inkq-muted)] mb-2">
+                {lang === 'ru'
+                  ? 'Рекомендуемый формат: соотношение сторон 4:1, без важного текста по краям.'
+                  : 'Recommended: 4:1 aspect ratio, avoid important text near the edges.'}
+              </p>
+              <BannerUploader role="studio" initialUrl={user?.banner_url} t={t} />
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-dashed border-[var(--inkq-border)] space-y-4">
+            <div class="space-y-2">
+              <h4 class="text-sm font-medium text-[var(--inkq-fg)]">
+                {lang === 'ru' ? 'Галерея студии' : 'Studio gallery'}
+              </h4>
+              <p class="text-xs text-[var(--inkq-muted)]">
+                {lang === 'ru'
+                  ? 'Добавьте несколько фото интерьера, зон для клиентов и рабочих мест.'
+                  : 'Add a few photos of the interior, client areas and workstations.'}
+              </p>
+            </div>
+            <GalleryUploader role="studio" t={t} kind="portfolio" maxItems={24} />
+
+            <div class="pt-4 flex flex-col items-start gap-3 border-t border-dashed border-[var(--inkq-border)]">
+              <button
+                type="button"
+                id="studio-finish-onboarding-button"
+                class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+              >
+                {t.onboarding.finishOnboarding}
+              </button>
+              <p class="text-xs text-[var(--inkq-muted)]">
+                {lang === 'ru'
+                  ? 'Вы всегда сможете изменить профиль студии и обновить галерею в панели студии.'
+                  : 'You can always update your studio profile and gallery later from the studio dashboard.'}
+              </p>
+              <div id="studio-finish-onboarding-message" class="text-sm text-[var(--inkq-muted)]"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script define:vars={{ apiUrl, lang }}>
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  async function finishStudioOnboarding() {
+    const button = document.getElementById('studio-finish-onboarding-button');
+    const messageEl = document.getElementById('studio-finish-onboarding-message');
+
+    if (!button || !messageEl) return;
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    if (!token) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Нет активной сессии. Пожалуйста, войдите снова.'
+          : 'No active session. Please sign in again.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    try {
+      button.disabled = true;
+      messageEl.textContent =
+        lang === 'ru' ? 'Завершение онбординга…' : 'Finishing onboarding…';
+      messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const response = await fetch(`${apiUrl}/api/v1/studios/me`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ onboarding_completed: true }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Error' }));
+
+        const isAuthError =
+          response.status === 401 ||
+          (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+
+        if (isAuthError) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Сессия истекла. Пожалуйста, войдите снова.'
+              : 'Session expired. Please sign in again.';
+          messageEl.className = 'text-sm text-red-500';
+          button.disabled = false;
+          return;
+        } else {
+          messageEl.textContent =
+            (errorData && errorData.detail) ||
+            (lang === 'ru'
+              ? 'Не удалось завершить онбординг студии'
+              : 'Failed to finish studio onboarding');
+        }
+
+        messageEl.className = 'text-sm text-red-500';
+        button.disabled = false;
+        return;
+      }
+
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Онбординг студии завершён, перенаправление в панель студии…'
+          : 'Studio onboarding completed, redirecting to your studio dashboard…';
+      messageEl.className = 'text-sm text-green-500';
+
+      const target = `/${lang}/dashboard/studio`;
+      setTimeout(() => {
+        window.location.href = target;
+      }, 800);
+    } catch (error) {
+      console.error('Failed to finish studio onboarding', error);
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Ошибка при завершении онбординга студии'
+          : 'Error while finishing studio onboarding';
+      messageEl.className = 'text-sm text-red-500';
+      button.disabled = false;
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => {
+      const button = document.getElementById('studio-finish-onboarding-button');
+      if (button && typeof button.addEventListener === 'function') {
+        button.addEventListener('click', finishStudioOnboarding);
+      }
+    });
+  }
+</script>
+

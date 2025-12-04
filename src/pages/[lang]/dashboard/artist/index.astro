@@ -1,0 +1,399 @@
+---
+import DashboardLayout from '../../../../layouts/DashboardLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../../i18n/index';
+import AvatarUploader from '../../../../components/AvatarUploader.astro';
+import BannerUploader from '../../../../components/BannerUploader.astro';
+import GalleryUploader from '../../../../components/GalleryUploader.astro';
+import ArtistProfileForm from '../../../../components/ArtistProfileForm.astro';
+import { getApiUrl } from '../../../../shared/config';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const user = Astro.locals.user;
+const sessionToken = Astro.locals.sessionToken;
+const apiUrl = getApiUrl();
+---
+
+<DashboardLayout title={t.dashboard.welcomeArtist} lang={lang} t={t} currentPath={currentPath}>
+  <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)] space-y-6">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-bold text-[var(--inkq-fg)]">{t.dashboard.welcomeArtist}</h1>
+      <p class="text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Управляйте своим профилем мастера, портфолио и идеями для татуировок.'
+          : 'Manage your artist profile, portfolio, and tattoo ideas.'}
+      </p>
+    </header>
+
+    <!-- Tabs -->
+    <div class="border-b border-[var(--inkq-border)] flex gap-4">
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="profile"
+        data-active="true"
+      >
+        {t.profile.profileTab}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="portfolio"
+        data-active="false"
+      >
+        {t.profile.portfolioTab}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="wannado"
+        data-active="false"
+      >
+        {t.profile.wannadoTab}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="invitations"
+        data-active="false"
+      >
+        {lang === 'ru' ? 'Приглашения студий' : 'Studio invitations'}
+      </button>
+    </div>
+
+    <!-- Tab panels -->
+    <section data-tab-panel="profile">
+      <div class="grid grid-cols-1 lg:grid-cols-[2fr,1.5fr] gap-8">
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Профиль мастера' : 'Artist profile'}
+          </h2>
+          <ArtistProfileForm lang={lang} t={t} sessionToken={sessionToken} />
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-sm font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Фотографии профиля' : 'Profile images'}
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs text-[var(--inkq-muted)] mb-1">{t.media.avatarUpload}</p>
+              <AvatarUploader role="artist" initialUrl={user?.avatar_url} t={t} />
+            </div>
+            <div>
+              <p class="text-xs text-[var(--inkq-muted)] mb-1">{t.media.bannerUpload}</p>
+              <BannerUploader role="artist" initialUrl={user?.banner_url} t={t} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab-panel="portfolio" class="hidden">
+      <div class="space-y-3">
+        <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.portfolioTitle}</h2>
+        <p class="text-sm text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Добавляйте и обновляйте свои лучшие работы. Они отображаются в вашем публичном профиле.'
+            : 'Add and update your best work. These appear on your public profile.'}
+        </p>
+        <GalleryUploader role="artist" t={t} kind="portfolio" maxItems={24} />
+      </div>
+    </section>
+
+    <section data-tab-panel="wannado" class="hidden">
+      <div class="space-y-3">
+        <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.wannadoTab}</h2>
+        <p class="text-sm text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Загружайте эскизы и идеи, которые вы хотите реализовать. Клиенты смогут выбирать из них.'
+            : 'Upload sketches and ideas you would love to tattoo. Clients can pick from these ideas.'}
+        </p>
+        <GalleryUploader role="artist" t={t} kind="wannado" maxItems={24} />
+      </div>
+    </section>
+
+    <section data-tab-panel="invitations" class="hidden">
+      <div class="space-y-4">
+        <div>
+          <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Приглашения от студий' : 'Studio invitations'}
+          </h2>
+          <p class="text-sm text-[var(--inkq-muted)]">
+            {lang === 'ru'
+              ? 'Здесь отображаются приглашения стать резидентом студии. Вы можете принять или отклонить их.'
+              : 'Here you can see invitations to join studios as a resident and accept or reject them.'}
+          </p>
+        </div>
+        <div id="artist-invitations-message" class="text-sm text-[var(--inkq-muted)]"></div>
+        <div class="overflow-x-auto border border-[var(--inkq-border)] rounded-lg">
+          <table class="min-w-full text-sm">
+            <thead class="bg-[var(--inkq-bg-subtle)] text-[var(--inkq-muted)]">
+              <tr>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Студия' : 'Studio'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Город' : 'City'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Статус' : 'Status'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Приглашение' : 'Invited at'}</th>
+                <th class="px-4 py-2 text-left font-medium"></th>
+              </tr>
+            </thead>
+            <tbody id="artist-invitations-table-body" class="divide-y divide-[var(--inkq-border)]"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</DashboardLayout>
+
+<script>
+  const triggers = document.querySelectorAll('[data-tab-trigger]');
+  const panels = document.querySelectorAll('[data-tab-panel]');
+
+  function setActiveTab(name) {
+    triggers.forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab-trigger') === name;
+      btn.setAttribute('data-active', isActive ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.getAttribute('data-tab-panel') === name;
+      if (isActive) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    });
+  }
+
+  triggers.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.getAttribute('data-tab-trigger');
+      if (name) setActiveTab(name);
+    });
+  });
+</script>
+
+<script define:vars={{ apiUrl, lang }}>
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  function formatDate(value) {
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      return d.toLocaleString();
+    } catch {
+      return value;
+    }
+  }
+
+  async function loadArtistInvitations() {
+    const tableBody = document.getElementById('artist-invitations-table-body');
+    const messageEl = document.getElementById('artist-invitations-message');
+    if (!tableBody) return;
+
+    const { headers, token } = buildAuthHeaders();
+    if (!token) {
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Сессия истекла. Пожалуйста, войдите снова.'
+            : 'Session expired. Please sign in again.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${apiUrl}/api/v1/artists/me/invitations`, {
+        headers,
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        if (messageEl) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Не удалось загрузить приглашения от студий.'
+              : 'Failed to load studio invitations.';
+          messageEl.className = 'text-sm text-red-500';
+        }
+        return;
+      }
+      const data = await resp.json();
+      const items = data.items || [];
+      if (items.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${lang === 'ru' ? 'Пока нет приглашений от студий.' : 'No studio invitations yet.'}</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = items
+        .map((item) => {
+          const statusLabel =
+            item.status === 'accepted'
+              ? lang === 'ru'
+                ? 'Принято'
+                : 'Accepted'
+              : item.status === 'rejected'
+                ? lang === 'ru'
+                  ? 'Отклонено'
+                  : 'Rejected'
+                : lang === 'ru'
+                  ? 'Приглашён'
+                  : 'Invited';
+          const disabled = item.status !== 'invited';
+          const acceptLabel = lang === 'ru' ? 'Принять' : 'Accept';
+          const rejectLabel = lang === 'ru' ? 'Отклонить' : 'Reject';
+          return `<tr>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-fg)]">${item.studio.name || `Studio #${item.studio.id}`}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${item.studio.city || ''}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-fg)]">${statusLabel}</td>
+            <td class="px-4 py-3 text-xs text-[var(--inkq-muted)] whitespace-nowrap">${formatDate(item.created_at)}</td>
+            <td class="px-4 py-3 text-sm">
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  data-invite-id="${item.id}"
+                  data-action="accept"
+                  class="px-3 py-1 rounded-md text-xs font-medium ${disabled ? 'opacity-40 cursor-default bg-[var(--inkq-bg-subtle)] text-[var(--inkq-muted)]' : 'bg-green-600 text-white hover:bg-green-700'}"
+                  ${disabled ? 'disabled' : ''}
+                >
+                  ${acceptLabel}
+                </button>
+                <button
+                  type="button"
+                  data-invite-id="${item.id}"
+                  data-action="reject"
+                  class="px-3 py-1 rounded-md text-xs font-medium ${disabled ? 'opacity-40 cursor-default bg-[var(--inkq-bg-subtle)] text-[var(--inkq-muted)]' : 'bg-red-600 text-white hover:bg-red-700'}"
+                  ${disabled ? 'disabled' : ''}
+                >
+                  ${rejectLabel}
+                </button>
+              </div>
+            </td>
+          </tr>`;
+        })
+        .join('');
+
+      tableBody.querySelectorAll('button[data-invite-id]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          const target = e.target;
+          const id = target.getAttribute('data-invite-id');
+          const action = target.getAttribute('data-action');
+          if (id && action) {
+            await updateInvitation(id, action);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Failed to load studio invitations', error);
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Ошибка при загрузке приглашений.'
+            : 'Error while loading invitations.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+    }
+  }
+
+  async function updateInvitation(id, action) {
+    const messageEl = document.getElementById('artist-invitations-message');
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    if (!token) {
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Сессия истекла. Пожалуйста, войдите снова.'
+            : 'Session expired. Please sign in again.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+      return;
+    }
+
+    const endpoint =
+      action === 'accept'
+        ? `${apiUrl}/api/v1/artists/me/invitations/${id}/accept`
+        : `${apiUrl}/api/v1/artists/me/invitations/${id}/reject`;
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({ detail: 'Error' }));
+        if (messageEl) {
+          messageEl.textContent =
+            errorData.detail ||
+            (lang === 'ru'
+              ? 'Не удалось обновить приглашение.'
+              : 'Failed to update invitation.');
+          messageEl.className = 'text-sm text-red-500';
+        }
+        return;
+      }
+      if (messageEl) {
+        messageEl.textContent =
+          action === 'accept'
+            ? (lang === 'ru'
+                ? 'Приглашение принято.'
+                : 'Invitation accepted.')
+            : (lang === 'ru'
+                ? 'Приглашение отклонено.'
+                : 'Invitation rejected.');
+        messageEl.className = 'text-sm text-green-500';
+      }
+      await loadArtistInvitations();
+    } catch (error) {
+      console.error('Failed to update invitation', error);
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Ошибка при обновлении приглашения.'
+            : 'Error while updating invitation.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => {
+      loadArtistInvitations();
+    });
+  }
+</script>
+

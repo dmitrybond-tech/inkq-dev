@@ -1,0 +1,603 @@
+---
+import DashboardLayout from '../../../../layouts/DashboardLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../../i18n/index';
+import AvatarUploader from '../../../../components/AvatarUploader.astro';
+import BannerUploader from '../../../../components/BannerUploader.astro';
+import GalleryUploader from '../../../../components/GalleryUploader.astro';
+import StudioProfileForm from '../../../../components/StudioProfileForm.astro';
+import { getApiUrl } from '../../../../shared/config';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const user = Astro.locals.user;
+const sessionToken = Astro.locals.sessionToken;
+const apiUrl = getApiUrl();
+---
+
+<DashboardLayout title={t.dashboard.welcomeStudio} lang={lang} t={t} currentPath={currentPath}>
+  <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)] space-y-6">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-bold text-[var(--inkq-fg)]">{t.dashboard.welcomeStudio}</h1>
+      <p class="text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Управляйте страницей студии, командой и заявками на бронирование.'
+          : 'Manage your studio page, team, and booking requests.'}
+      </p>
+    </header>
+
+    <!-- Tabs -->
+    <div class="border-b border-[var(--inkq-border)] flex gap-4">
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="overview"
+        data-active="true"
+      >
+        {t.dashboard.navOverview}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="team"
+        data-active="false"
+      >
+        {lang === 'ru' ? 'Команда' : 'Team'}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="gallery"
+        data-active="false"
+      >
+        {lang === 'ru' ? 'Галерея' : 'Gallery'}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="requests"
+        data-active="false"
+      >
+        {lang === 'ru' ? 'Заявки' : 'Requests'}
+      </button>
+    </div>
+
+    <!-- Overview -->
+    <section data-tab-panel="overview">
+      <div class="grid grid-cols-1 lg:grid-cols-[2fr,1.5fr] gap-8">
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Профиль студии' : 'Studio profile'}
+          </h2>
+          <StudioProfileForm lang={lang} t={t} sessionToken={sessionToken} />
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-sm font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Фотографии профиля' : 'Profile images'}
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs text-[var(--inkq-muted)] mb-1">{t.media.avatarUpload}</p>
+              <AvatarUploader role="studio" initialUrl={user?.avatar_url} t={t} />
+            </div>
+            <div>
+              <p class="text-xs text-[var(--inkq-muted)] mb-1">{t.media.bannerUpload}</p>
+              <BannerUploader role="studio" initialUrl={user?.banner_url} t={t} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section data-tab-panel="team" class="hidden">
+      <div class="space-y-4">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+              {lang === 'ru' ? 'Команда студии' : 'Studio team'}
+            </h2>
+            <p class="text-sm text-[var(--inkq-muted)]">
+              {lang === 'ru'
+                ? 'Пригласите мастеров в студию по имени пользователя или email. Принятые резиденты появятся на публичной странице.'
+                : 'Invite artists to your studio by username or email. Accepted residents will appear on your public page.'}
+            </p>
+          </div>
+          <form id="studio-team-invite-form" class="flex flex-col md:flex-row gap-2 md:items-center">
+            <input
+              id="studio-team-invite-input"
+              type="text"
+              required
+              placeholder={lang === 'ru' ? 'Имя пользователя или email мастера' : 'Artist username or email'}
+              class="w-full md:w-72 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            />
+            <button
+              type="submit"
+              class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+            >
+              {lang === 'ru' ? 'Пригласить' : 'Invite'}
+            </button>
+          </form>
+        </div>
+        <div id="studio-team-message" class="text-sm text-[var(--inkq-muted)]"></div>
+        <div class="overflow-x-auto border border-[var(--inkq-border)] rounded-lg">
+          <table class="min-w-full text-sm">
+            <thead class="bg-[var(--inkq-bg-subtle)] text-[var(--inkq-muted)]">
+              <tr>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Мастер' : 'Artist'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Статус' : 'Status'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Приглашён' : 'Date invited'}</th>
+              </tr>
+            </thead>
+            <tbody id="studio-team-table-body" class="divide-y divide-[var(--inkq-border)]"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gallery -->
+    <section data-tab-panel="gallery" class="hidden">
+      <div class="space-y-3">
+        <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+          {lang === 'ru' ? 'Галерея студии' : 'Studio gallery'}
+        </h2>
+        <p class="text-sm text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Добавляйте фото интерьера и атмосферы студии. Они отображаются на публичной странице.'
+            : 'Add photos of your studio interior and atmosphere. They appear on your public studio page.'}
+        </p>
+        <GalleryUploader role="studio" t={t} kind="portfolio" maxItems={24} />
+      </div>
+    </section>
+
+    <!-- Requests -->
+    <section data-tab-panel="requests" class="hidden">
+      <div class="space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+              {lang === 'ru' ? 'Заявки на бронирование' : 'Booking requests'}
+            </h2>
+            <p class="text-sm text-[var(--inkq-muted)]">
+              {lang === 'ru'
+                ? 'Следите за входящими заявками от клиентов и обновляйте их статус.'
+                : 'Track incoming booking requests from clients and update their status.'}
+            </p>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-[var(--inkq-muted)]">{lang === 'ru' ? 'Статус:' : 'Status:'}</span>
+            <select
+              id="studio-requests-status-filter"
+              class="rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-2 py-1 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            >
+              <option value="all">{lang === 'ru' ? 'Все' : 'All'}</option>
+              <option value="new">{lang === 'ru' ? 'Новые' : 'New'}</option>
+              <option value="in_progress">{lang === 'ru' ? 'В работе' : 'In progress'}</option>
+              <option value="closed">{lang === 'ru' ? 'Закрыты' : 'Closed'}</option>
+            </select>
+          </div>
+        </div>
+        <div id="studio-requests-message" class="text-sm text-[var(--inkq-muted)]"></div>
+        <div class="overflow-x-auto border border-[var(--inkq-border)] rounded-lg">
+          <table class="min-w-full text-sm">
+            <thead class="bg-[var(--inkq-bg-subtle)] text-[var(--inkq-muted)]">
+              <tr>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Создана' : 'Created at'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Тип' : 'Type'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Мастер' : 'Artist'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Клиент' : 'Client'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Контакт' : 'Contact'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Комментарий' : 'Comment'}</th>
+                <th class="px-4 py-2 text-left font-medium">{lang === 'ru' ? 'Статус' : 'Status'}</th>
+              </tr>
+            </thead>
+            <tbody id="studio-requests-table-body" class="divide-y divide-[var(--inkq-border)]"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</DashboardLayout>
+
+<script define:vars={{ apiUrl, lang }}>
+  const triggers = document.querySelectorAll('[data-tab-trigger]');
+  const panels = document.querySelectorAll('[data-tab-panel]');
+
+  function setActiveTab(name) {
+    triggers.forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab-trigger') === name;
+      btn.setAttribute('data-active', isActive ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.getAttribute('data-tab-panel') === name;
+      if (isActive) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    });
+  }
+
+  triggers.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.getAttribute('data-tab-trigger');
+      if (name) setActiveTab(name);
+    });
+  });
+
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  function formatDate(value) {
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      return d.toLocaleString();
+    } catch {
+      return value;
+    }
+  }
+
+  // Team tab logic
+  async function loadTeam() {
+    const tableBody = document.getElementById('studio-team-table-body');
+    const messageEl = document.getElementById('studio-team-message');
+    if (!tableBody) return;
+
+    const { headers, token } = buildAuthHeaders();
+    if (!token) {
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Сессия истекла. Пожалуйста, войдите снова.'
+            : 'Session expired. Please sign in again.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${apiUrl}/api/v1/studios/me/residents`, {
+        headers,
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        if (messageEl) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Не удалось загрузить команду студии.'
+              : 'Failed to load studio team.';
+          messageEl.className = 'text-sm text-red-500';
+        }
+        return;
+      }
+      const data = await resp.json();
+      const items = data.items || [];
+      if (items.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="3" class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${lang === 'ru' ? 'Пока нет приглашённых мастеров.' : 'No invited artists yet.'}</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = items
+        .map((item) => {
+          const statusLabel =
+            item.status === 'accepted'
+              ? lang === 'ru'
+                ? 'Принято'
+                : 'Accepted'
+              : item.status === 'rejected'
+                ? lang === 'ru'
+                  ? 'Отклонено'
+                  : 'Rejected'
+                : lang === 'ru'
+                  ? 'Приглашён'
+                  : 'Invited';
+          return `<tr>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center text-xs">
+                  ${
+                    item.avatar_url
+                      ? `<img src="${item.avatar_url}" alt="${item.username}" class="w-full h-full object-cover" />`
+                      : (item.display_name || item.username || '?').slice(0, 1)
+                  }
+                </div>
+                <div>
+                  <div class="text-sm text-[var(--inkq-fg)]">${item.display_name || item.username}</div>
+                  <div class="text-xs text-[var(--inkq-muted)]">@${item.username}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-fg)]">${statusLabel}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${formatDate(item.created_at)}</td>
+          </tr>`;
+        })
+        .join('');
+    } catch (error) {
+      console.error('Failed to load studio team', error);
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Ошибка при загрузке команды студии.'
+            : 'Error while loading studio team.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+    }
+  }
+
+  async function handleInviteSubmit(event) {
+    event.preventDefault();
+    const input = document.getElementById('studio-team-invite-input');
+    const messageEl = document.getElementById('studio-team-message');
+    if (!input || !messageEl) return;
+
+    const identifier = input.value.trim();
+    if (!identifier) return;
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    if (!token) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Сессия истекла. Пожалуйста, войдите снова.'
+          : 'Session expired. Please sign in again.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    try {
+      messageEl.textContent =
+        lang === 'ru' ? 'Отправка приглашения…' : 'Sending invitation…';
+      messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const resp = await fetch(`${apiUrl}/api/v1/studios/me/residents/invite`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ identifier }),
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({ detail: 'Error' }));
+        messageEl.textContent =
+          errorData.detail ||
+          (lang === 'ru' ? 'Не удалось отправить приглашение.' : 'Failed to send invitation.');
+        messageEl.className = 'text-sm text-red-500';
+        return;
+      }
+
+      input.value = '';
+      messageEl.textContent =
+        lang === 'ru' ? 'Приглашение отправлено.' : 'Invitation sent.';
+      messageEl.className = 'text-sm text-green-500';
+      await loadTeam();
+    } catch (error) {
+      console.error('Failed to invite resident', error);
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Ошибка при отправке приглашения.'
+          : 'Error while sending invitation.';
+      messageEl.className = 'text-sm text-red-500';
+    }
+  }
+
+  // Requests tab logic
+  async function loadRequests() {
+    const tableBody = document.getElementById('studio-requests-table-body');
+    const messageEl = document.getElementById('studio-requests-message');
+    const statusFilter = document.getElementById('studio-requests-status-filter');
+    if (!tableBody) return;
+
+    const statusValue = statusFilter ? statusFilter.value : 'all';
+
+    const { headers, token } = buildAuthHeaders();
+    if (!token) {
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Сессия истекла. Пожалуйста, войдите снова.'
+            : 'Session expired. Please sign in again.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+      return;
+    }
+
+    try {
+      const url =
+        statusValue && statusValue !== 'all'
+          ? `${apiUrl}/api/v1/studios/me/booking-requests?status=${encodeURIComponent(statusValue)}`
+          : `${apiUrl}/api/v1/studios/me/booking-requests`;
+      const resp = await fetch(url, {
+        headers,
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        if (messageEl) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Не удалось загрузить заявки.'
+              : 'Failed to load booking requests.';
+          messageEl.className = 'text-sm text-red-500';
+        }
+        return;
+      }
+      const data = await resp.json();
+      const items = data.items || [];
+      if (items.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="7" class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${lang === 'ru' ? 'Пока нет заявок.' : 'No booking requests yet.'}</td></tr>`;
+        return;
+      }
+
+      tableBody.innerHTML = items
+        .map((item) => {
+          const typeLabel =
+            item.type === 'artist_specific'
+              ? lang === 'ru'
+                ? 'Конкретный мастер'
+                : 'Artist specific'
+              : lang === 'ru'
+                ? 'Общая'
+                : 'General';
+          const statusLabel =
+            item.status === 'in_progress'
+              ? lang === 'ru'
+                ? 'В работе'
+                : 'In progress'
+              : item.status === 'closed'
+                ? lang === 'ru'
+                  ? 'Закрыта'
+                  : 'Closed'
+                : lang === 'ru'
+                  ? 'Новая'
+                  : 'New';
+          const shortComment =
+            item.comment && item.comment.length > 80
+              ? `${item.comment.slice(0, 77)}…`
+              : item.comment || '';
+
+          return `<tr>
+            <td class="px-4 py-3 text-xs text-[var(--inkq-muted)] whitespace-nowrap">${formatDate(item.created_at)}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-fg)]">${typeLabel}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${item.artist_id || ''}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-fg)]">${item.client_name}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-muted)]">${item.client_contact}</td>
+            <td class="px-4 py-3 text-sm text-[var(--inkq-muted)] max-w-xs">${shortComment}</td>
+            <td class="px-4 py-3 text-sm">
+              <select
+                data-request-id="${item.id}"
+                class="rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-2 py-1 text-xs text-[var(--inkq-fg)] focus:outline-none focus:ring-1 focus:ring-[var(--inkq-fg)]"
+              >
+                <option value="new" ${item.status === 'new' ? 'selected' : ''}>${lang === 'ru' ? 'Новая' : 'New'}</option>
+                <option value="in_progress" ${item.status === 'in_progress' ? 'selected' : ''}>${lang === 'ru' ? 'В работе' : 'In progress'}</option>
+                <option value="closed" ${item.status === 'closed' ? 'selected' : ''}>${lang === 'ru' ? 'Закрыта' : 'Closed'}</option>
+              </select>
+            </td>
+          </tr>`;
+        })
+        .join('');
+
+      tableBody.querySelectorAll('select[data-request-id]').forEach((sel) => {
+        sel.addEventListener('change', async (e) => {
+          const target = e.target;
+          const id = target.getAttribute('data-request-id');
+          const newStatus = target.value;
+          await updateRequestStatus(id, newStatus);
+        });
+      });
+    } catch (error) {
+      console.error('Failed to load booking requests', error);
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Ошибка при загрузке заявок.'
+            : 'Error while loading booking requests.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+    }
+  }
+
+  async function updateRequestStatus(id, status) {
+    const messageEl = document.getElementById('studio-requests-message');
+    if (!id) return;
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    if (!token) {
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Сессия истекла. Пожалуйста, войдите снова.'
+            : 'Session expired. Please sign in again.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${apiUrl}/api/v1/studios/me/booking-requests/${id}`, {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({ detail: 'Error' }));
+        if (messageEl) {
+          messageEl.textContent =
+            errorData.detail ||
+            (lang === 'ru'
+              ? 'Не удалось обновить статус заявки.'
+              : 'Failed to update booking request status.');
+          messageEl.className = 'text-sm text-red-500';
+        }
+        return;
+      }
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru' ? 'Статус заявки обновлён.' : 'Booking request status updated.';
+        messageEl.className = 'text-sm text-green-500';
+      }
+    } catch (error) {
+      console.error('Failed to update booking request', error);
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru'
+            ? 'Ошибка при обновлении статуса заявки.'
+            : 'Error while updating booking request status.';
+        messageEl.className = 'text-sm text-red-500';
+      }
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => {
+      // Load initial data for team and requests
+      loadTeam();
+      loadRequests();
+
+      const inviteForm = document.getElementById('studio-team-invite-form');
+      if (inviteForm && typeof inviteForm.addEventListener === 'function') {
+        inviteForm.addEventListener('submit', handleInviteSubmit);
+      }
+
+      const statusFilter = document.getElementById('studio-requests-status-filter');
+      if (statusFilter && typeof statusFilter.addEventListener === 'function') {
+        statusFilter.addEventListener('change', loadRequests);
+      }
+    });
+  }
+</script>
+

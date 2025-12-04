@@ -1,0 +1,322 @@
+---
+import type { Lang, I18nSchema } from '../i18n/types';
+import { getApiUrl } from '../shared/config';
+
+interface ArtistMeResponse {
+  username: string;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  onboarding_completed: boolean;
+  about?: string | null;
+  styles: string[];
+  city?: string | null;
+  studio_id?: number | null;
+  session_price?: number | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  steps?: {
+    about_complete: boolean;
+    media_complete: boolean;
+    portfolio_complete: boolean;
+    wannado_complete: boolean;
+    first_incomplete_step: number;
+  };
+}
+
+interface Props {
+  lang: Lang;
+  t: I18nSchema;
+  artist?: ArtistMeResponse | null;
+  sessionToken?: string | null;
+}
+
+const { lang, t, artist: initialArtist = null, sessionToken = null } = Astro.props;
+const apiUrl = getApiUrl();
+const formId = `artist-profile-form-${Math.random().toString(36).slice(2, 9)}`;
+
+const AVAILABLE_STYLES: { id: string; labelEn: string; labelRu: string }[] = [
+  { id: 'traditional', labelEn: 'Traditional', labelRu: 'Традиционный' },
+  { id: 'neo_traditional', labelEn: 'Neo-traditional', labelRu: 'Нео-традиционный' },
+  { id: 'blackwork', labelEn: 'Blackwork', labelRu: 'Блэкворк' },
+  { id: 'realism', labelEn: 'Realism', labelRu: 'Реализм' },
+  { id: 'watercolor', labelEn: 'Watercolor', labelRu: 'Акварель' },
+  { id: 'geometric', labelEn: 'Geometric', labelRu: 'Геометрия' },
+  { id: 'minimalist', labelEn: 'Minimalist', labelRu: 'Минимализм' },
+];
+
+const styleLabel = (id: string) => {
+  const entry = AVAILABLE_STYLES.find((s) => s.id === id);
+  if (!entry) return id;
+  return lang === 'ru' ? entry.labelRu : entry.labelEn;
+};
+---
+
+<form id={formId} class="space-y-6">
+  <div class="space-y-2">
+    <label for={`${formId}-about`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {t.profile.aboutLabel}
+    </label>
+    <textarea
+      id={`${formId}-about`}
+      name="about"
+      class="w-full min-h-[120px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      maxlength={2000}
+      required
+    >
+      {initialArtist?.about || ''}
+    </textarea>
+    <p class="text-xs text-[var(--inkq-muted)]">
+      {lang === 'ru'
+        ? 'Расскажите о вашем опыте, стиле и подходе к работе. До 2000 символов.'
+        : 'Tell clients about your experience, style, and approach. Up to 2000 characters.'}
+    </p>
+  </div>
+
+  <div class="space-y-2">
+    <span class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {t.profile.stylesLabel}
+      <span class="text-red-500">*</span>
+    </span>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+      {AVAILABLE_STYLES.map((style) => (
+        <label class="flex items-center gap-2 text-sm text-[var(--inkq-fg)]">
+          <input
+            type="checkbox"
+            name="styles"
+            value={style.id}
+            checked={initialArtist?.styles?.includes(style.id)}
+            class="h-4 w-4 rounded border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]"
+          />
+          <span>{styleLabel(style.id)}</span>
+        </label>
+      ))}
+    </div>
+    <p class="text-xs text-[var(--inkq-muted)]">
+      {lang === 'ru'
+        ? 'Выберите хотя бы один стиль, в котором вы работаете.'
+        : 'Select at least one style you work in.'}
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-2">
+      <label for={`${formId}-city`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.cityLabel}
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        id={`${formId}-city`}
+        name="city"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        required
+        value={initialArtist?.city || ''}
+      />
+    </div>
+
+    <div class="space-y-2">
+      <label for={`${formId}-studio-id`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.studioLabel}
+      </label>
+      <input
+        id={`${formId}-studio-id`}
+        name="studio_id"
+        type="number"
+        min="0"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        value={initialArtist?.studio_id ?? ''}
+      />
+      <p class="text-xs text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Прикрепите ID студии, если вы уже работаете в студии (опционально).'
+          : 'Attach a studio ID if you work with a studio (optional).'}
+      </p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-2">
+      <label for={`${formId}-session-price`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.sessionPriceLabel}
+      </label>
+      <input
+        id={`${formId}-session-price`}
+        name="session_price"
+        type="number"
+        min="0"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        value={initialArtist?.session_price ?? ''}
+      />
+    </div>
+
+    <div class="space-y-2">
+      <label for={`${formId}-instagram`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.instagramLabel}
+      </label>
+      <input
+        id={`${formId}-instagram`}
+        name="instagram"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        placeholder={lang === 'ru' ? '@nickname или ссылка' : '@handle or link'}
+        value={initialArtist?.instagram || ''}
+      />
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <label for={`${formId}-telegram`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {t.profile.telegramLabel}
+    </label>
+    <input
+      id={`${formId}-telegram`}
+      name="telegram"
+      type="text"
+      class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      placeholder={lang === 'ru' ? '@nickname или ссылка' : '@handle or link'}
+      value={initialArtist?.telegram || ''}
+    />
+  </div>
+
+  <div id={`${formId}-message`} class="text-sm text-[var(--inkq-muted)]"></div>
+
+  <button
+    type="submit"
+    class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+  >
+    {lang === 'ru' ? 'Сохранить профиль' : 'Save profile'}
+  </button>
+</form>
+
+<script define:vars={{ apiUrl, formId, t, lang, sessionToken }}>
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = sessionToken || getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    const messageEl = document.getElementById(`${formId}-message`);
+
+    if (!form || !messageEl) return;
+
+    const formData = new FormData(form);
+    const about = (formData.get('about') || '').toString().trim();
+    const city = (formData.get('city') || '').toString().trim();
+    const styles = formData.getAll('styles').map((v) => v.toString());
+
+    if (!about || !city || styles.length === 0) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Пожалуйста, заполните раздел «О себе», город и выберите хотя бы один стиль.'
+          : 'Please fill in About, City and select at least one style.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    const studioIdRaw = formData.get('studio_id')?.toString().trim() || '';
+    const sessionPriceRaw = formData.get('session_price')?.toString().trim() || '';
+
+    const payload = {
+      about,
+      styles,
+      city,
+      studio_id: studioIdRaw ? Number(studioIdRaw) : null,
+      session_price: sessionPriceRaw ? Number(sessionPriceRaw) : null,
+      instagram: (formData.get('instagram') || '').toString().trim() || null,
+      telegram: (formData.get('telegram') || '').toString().trim() || null,
+    };
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    if (!token) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Нет активной сессии. Пожалуйста, войдите снова.'
+          : 'No active session. Please sign in again.';
+      messageEl.className = 'text-sm text-red-500';
+      // Optionally redirect the user back to signin
+      // window.location.href = `/${lang}/signin`;
+      return;
+    }
+
+    try {
+      messageEl.textContent = lang === 'ru' ? 'Сохранение…' : 'Saving…';
+      messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const response = await fetch(`${apiUrl}/api/v1/artists/me`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Error' }));
+
+        const isAuthError =
+          response.status === 401 ||
+          (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+
+        if (isAuthError) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Сессия истекла. Пожалуйста, войдите снова.'
+              : 'Session expired. Please sign in again.';
+          messageEl.className = 'text-sm text-red-500';
+          return;
+        } else {
+          messageEl.textContent =
+            (errorData && errorData.detail) ||
+            (lang === 'ru' ? 'Не удалось сохранить профиль' : 'Failed to save profile');
+        }
+
+        messageEl.className = 'text-sm text-red-500';
+        return;
+      }
+
+      messageEl.textContent = lang === 'ru' ? 'Профиль сохранён' : 'Profile saved';
+      messageEl.className = 'text-sm text-green-500';
+    } catch (error) {
+      console.error('Failed to update artist profile', error);
+      messageEl.textContent =
+        lang === 'ru' ? 'Ошибка при сохранении профиля' : 'Error while saving profile';
+      messageEl.className = 'text-sm text-red-500';
+    }
+  }
+
+  const form = document.getElementById(formId);
+  if (form && typeof form.addEventListener === 'function') {
+    form.addEventListener('submit', handleSubmit);
+  }
+</script>
+
+

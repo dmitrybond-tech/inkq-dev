@@ -1,0 +1,212 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
+import type { Lang, I18nSchema } from '../../../i18n/types';
+import { callBackendJsonParse } from '../../../shared/api/client';
+
+export const prerender = false;
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+type PublicStudioCard = {
+  id: number;
+  username: string;
+  slug: string;
+  name?: string | null;
+  city?: string | null;
+  session_price_label?: string | null;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+};
+
+type PublicStudioListResponse = {
+  items: PublicStudioCard[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+const lang: Lang = resolveLangFromParams(Astro.params.lang);
+const t: I18nSchema = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+
+const searchParams = Astro.url.searchParams;
+const cityParam = searchParams.get('city') || '';
+const limitParam = searchParams.get('limit');
+const offsetParam = searchParams.get('offset');
+
+const parsedLimit = limitParam ? Number(limitParam) : 16;
+const parsedOffset = offsetParam ? Number(offsetParam) : 0;
+const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 48) : 16;
+const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+
+let catalog: PublicStudioListResponse | null = null;
+let loadError: string | null = null;
+
+try {
+  const query = new URLSearchParams();
+  if (cityParam) query.set('city', cityParam);
+  query.set('limit', String(limit));
+  query.set('offset', String(offset));
+
+  const queryString = query.toString() ? `?${query.toString()}` : '';
+  catalog = await callBackendJsonParse<PublicStudioListResponse>(`/api/v1/public/studios${queryString}`);
+} catch (error: any) {
+  loadError = error?.message || t.catalogStudios.loadError;
+}
+
+const hasResults = !!catalog && catalog.items.length > 0;
+const canLoadMore = !!catalog && catalog.items.length + catalog.offset < catalog.total;
+
+const buildQuery = (nextOffset: number) => {
+  const params = new URLSearchParams();
+  if (cityParam) params.set('city', cityParam);
+  if (limit !== 16) params.set('limit', String(limit));
+  if (nextOffset > 0) params.set('offset', String(nextOffset));
+  const q = params.toString();
+  return q ? `?${q}` : '';
+};
+---
+
+<PublicLayout title={t.catalogStudios.title} lang={lang} t={t} currentPath={currentPath}>
+  <div class="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h1 class="text-3xl font-bold mb-2 text-[var(--inkq-fg)]">{t.catalogStudios.title}</h1>
+      <p class="text-[var(--inkq-muted)]">{t.catalogStudios.subtitle}</p>
+      {catalog && (
+        <p class="mt-2 text-xs text-[var(--inkq-muted)]">
+          {catalog.total} {t.catalogStudios.resultsLabel}
+        </p>
+      )}
+    </div>
+    <form method="GET" action={Astro.url.pathname} class="flex flex-col gap-3 md:flex-row md:items-end">
+      <div class="flex flex-col gap-1">
+        <label for="city" class="text-sm font-medium text-[var(--inkq-fg)]">
+          {t.catalog.filterCity}
+        </label>
+        <input
+          id="city"
+          name="city"
+          type="text"
+          value={cityParam}
+          placeholder={lang === 'ru' ? 'Например, Berlin' : 'E.g., Berlin'}
+          class="min-w-[180px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        />
+      </div>
+
+      <input type="hidden" name="limit" value={limit} />
+
+      <div class="flex gap-2">
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+        >
+          {lang === 'ru' ? 'Применить' : 'Apply'}
+        </button>
+        <a
+          href={Astro.url.pathname}
+          class="inline-flex items-center justify-center rounded-md border border-[var(--inkq-border)] px-4 py-2 text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+        >
+          {t.catalog.clearFilters}
+        </a>
+      </div>
+    </form>
+  </div>
+
+  {loadError && (
+    <div class="rounded-md border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-500 flex items-center justify-between mb-6">
+      <span>
+        {t.catalogStudios.loadError} {loadError !== t.catalogStudios.loadError && `(${loadError})`}
+      </span>
+      <a
+        href={Astro.url.href}
+        class="ml-4 inline-flex items-center justify-center rounded-md border border-red-500/60 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10 transition-colors"
+      >
+        {t.catalog.retry}
+      </a>
+    </div>
+  )}
+
+  {catalog && hasResults && (
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {catalog.items.map((studio) => {
+        const cardTitle = studio.name || studio.username;
+
+        return (
+          <a
+            href={`/${lang}/studios/${studio.slug}`}
+            class="group block overflow-hidden rounded-xl border border-[var(--inkq-border)] bg-[var(--inkq-surface)] hover:border-[var(--inkq-muted)] transition-colors shadow-sm"
+          >
+            <div class="relative h-28 w-full bg-[var(--inkq-bg-subtle)]">
+              <img
+                src={studio.banner_url || '/placeholder-banner.svg'}
+                alt={cardTitle}
+                class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                loading="lazy"
+              />
+              <div class="absolute -bottom-[50px] left-4 flex items-end gap-3">
+                <!-- Avatar: 100x100px for listing cards -->
+                <div class="h-[100px] w-[100px] rounded-full border-4 border-[var(--inkq-surface)] bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center text-xl font-semibold text-[var(--inkq-muted)]">
+                  {studio.avatar_url ? (
+                    <img
+                      src={studio.avatar_url}
+                      alt={studio.username}
+                      class="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span>{cardTitle.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div class="pb-2">
+                  <h2 class="text-lg font-semibold text-[var(--inkq-fg)] line-clamp-1">
+                    {cardTitle}
+                  </h2>
+                  <p class="text-sm text-[var(--inkq-muted)] line-clamp-1">
+                    @{studio.username}
+                    {studio.city ? ` • ${studio.city}` : ''}
+                  </p>
+                  {studio.session_price_label && (
+                    <p class="mt-1 text-xs font-medium text-[var(--inkq-fg)]">
+                      {studio.session_price_label}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-14 pb-4 px-4 flex flex-col gap-3">
+              {!studio.session_price_label && (
+                <p class="text-xs text-[var(--inkq-muted)]">
+                  {lang === 'ru' ? 'Цена по запросу' : 'Price on request'}
+                </p>
+              )}
+            </div>
+          </a>
+        );
+      })}
+    </div>
+  )}
+
+  {catalog && !hasResults && !loadError && (
+    <div class="mt-10 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-6 py-8 text-center space-y-3">
+      <h2 class="text-lg font-semibold text-[var(--inkq-fg)]">{t.catalogStudios.empty}</h2>
+    </div>
+  )}
+
+  {catalog && hasResults && canLoadMore && (
+    <div class="mt-8 flex justify-center">
+      <a
+        href={buildQuery(catalog.offset + catalog.limit)}
+        class="inline-flex items-center justify-center rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-surface)] px-6 py-2 text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+      >
+        {t.catalog.loadMore}
+      </a>
+    </div>
+  )}
+</PublicLayout>
+

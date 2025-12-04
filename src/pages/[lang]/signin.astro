@@ -1,0 +1,166 @@
+---
+import PublicLayout from '../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../i18n/index';
+import { getApiUrl } from '../../shared/config';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const error = Astro.url.searchParams.get('error');
+const apiUrl = getApiUrl();
+---
+
+<PublicLayout title={t.common.signIn} lang={lang} t={t} currentPath={currentPath}>
+  <div class="max-w-md mx-auto">
+    <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)]">
+      <h2 class="text-2xl font-bold mb-6 text-[var(--inkq-fg)]">{t.common.signIn}</h2>
+      {error && (
+        <div class="mb-4 p-3 rounded-md bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+          {error}
+        </div>
+      )}
+      {!error && (
+        <div
+          id="signin-error"
+          class="hidden mb-4 p-3 rounded-md bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm"
+        ></div>
+      )}
+      <form
+        id="signin-form"
+        method="post"
+        action="/api/v1/auth/signin"
+        class="space-y-4"
+      >
+        <div>
+          <label for="login" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
+            {t.auth.emailLabel} or Username
+          </label>
+          <input
+            type="text"
+            id="login"
+            name="login"
+            class="w-full px-4 py-2 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-muted)]"
+            required
+            autocomplete="username"
+          />
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
+            {t.auth.passwordLabel}
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            class="w-full px-4 py-2 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-muted)]"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full px-4 py-2 rounded-md font-medium bg-[var(--inkq-fg)] text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+        >
+          {t.common.signIn}
+        </button>
+      </form>
+      <p class="mt-4 text-sm text-[var(--inkq-muted)] text-center">
+        Don't have an account?{' '}
+        <a href={`/${lang}/signup`} class="text-[var(--inkq-fg)] hover:underline">
+          {t.common.signUp}
+        </a>
+      </p>
+    </div>
+  </div>
+</PublicLayout>
+
+<script define:vars={{ apiUrl, lang }}>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('signin-form');
+    const errorEl = document.getElementById('signin-error');
+
+    if (!form) {
+      return;
+    }
+
+    function showError(message) {
+      if (!errorEl) return;
+      errorEl.textContent = message || 'Signin failed. Please try again.';
+      errorEl.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+      }
+
+      const formData = new FormData(form);
+      const login = formData.get('login');
+      const password = formData.get('password');
+
+      if (typeof login !== 'string' || typeof password !== 'string') {
+        showError('Please provide login and password.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/auth/signin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            login,
+            password,
+          }),
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          if (response.status === 401 && data && data.detail === 'invalid_credentials') {
+            showError('Invalid email/username or password.');
+          } else if (data && data.detail) {
+            showError(typeof data.detail === 'string' ? data.detail : 'Signin failed.');
+          } else {
+            showError('Signin failed. Please try again.');
+          }
+          return;
+        }
+
+        if (!data || !data.access_token || !data.user) {
+          showError('Unexpected response from server.');
+          return;
+        }
+
+        const token = data.access_token;
+        const user = data.user;
+
+        // Set session cookie for middleware and other frontend logic
+        document.cookie = `inkq_session=${encodeURIComponent(token)}; path=/`;
+
+        let redirectPath;
+        if (!user.onboarding_completed) {
+          redirectPath = `/${lang}/onboarding/${user.account_type}`;
+        } else {
+          redirectPath = `/${lang}/dashboard/${user.account_type}`;
+        }
+
+        window.location.href = redirectPath;
+      } catch (err) {
+        showError('Signin failed. Please check your connection and try again.');
+      }
+    });
+  });
+</script>
+

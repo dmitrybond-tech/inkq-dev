@@ -1,0 +1,40 @@
+---
+import PublicLayout from '../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../i18n/index';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+---
+
+<PublicLayout title={t.landing.heroTitle} lang={lang} t={t} currentPath={currentPath}>
+  <div class="text-center py-16">
+    <h1 class="text-4xl md:text-5xl font-bold mb-4 text-[var(--inkq-fg)]">
+      {t.landing.heroTitle}
+    </h1>
+    <p class="text-xl mb-8 text-[var(--inkq-muted)] max-w-2xl mx-auto">
+      {t.landing.heroSubtitle}
+    </p>
+    <div class="flex gap-4 justify-center">
+      <a
+        href={`/${lang}/artists`}
+        class="px-6 py-3 rounded-md font-medium bg-[var(--inkq-fg)] text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+      >
+        {t.landing.ctaFindArtist}
+      </a>
+      <a
+        href={`/${lang}/signup`}
+        class="px-6 py-3 rounded-md font-medium border border-[var(--inkq-border)] bg-[var(--inkq-surface)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+      >
+        {t.landing.ctaJoinAsArtist}
+      </a>
+    </div>
+  </div>
+</PublicLayout>
+

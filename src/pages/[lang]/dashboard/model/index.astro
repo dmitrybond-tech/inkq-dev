@@ -1,0 +1,120 @@
+---
+import DashboardLayout from '../../../../layouts/DashboardLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../../i18n/index';
+import AvatarUploader from '../../../../components/AvatarUploader.astro';
+import BannerUploader from '../../../../components/BannerUploader.astro';
+import GalleryUploader from '../../../../components/GalleryUploader.astro';
+import ModelProfileForm from '../../../../components/ModelProfileForm.astro';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const user = Astro.locals.user;
+const sessionToken = Astro.locals.sessionToken;
+---
+
+<DashboardLayout title={t.dashboard.welcomeModel} lang={lang} t={t} currentPath={currentPath}>
+  <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)] space-y-6">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-bold text-[var(--inkq-fg)]">{t.dashboard.welcomeModel}</h1>
+      <p class="text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Управляйте профилем модели, фотографиями и видимостью вашей страницы.'
+          : 'Manage your model profile, photos and public page visibility.'}
+      </p>
+    </header>
+
+    <div class="border-b border-[var(--inkq-border)] flex gap-4">
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="profile"
+        data-active="true"
+      >
+        {t.profile.profileTab}
+      </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+        data-tab-trigger="gallery"
+        data-active="false"
+      >
+        {lang === 'ru' ? 'Галерея' : 'Gallery'}
+      </button>
+    </div>
+
+    <section data-tab-panel="profile">
+      <div class="grid grid-cols-1 lg:grid-cols-[2fr,1.5fr] gap-8">
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Профиль модели' : 'Model profile'}
+          </h2>
+          <ModelProfileForm lang={lang} t={t} sessionToken={sessionToken} />
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-sm font-semibold text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Фотографии профиля' : 'Profile images'}
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs text-[var(--inkq-muted)] mb-1">{t.media.avatarUpload}</p>
+              <AvatarUploader role="model" initialUrl={user?.avatar_url} t={t} />
+            </div>
+            <div>
+              <p class="text-xs text-[var(--inkq-muted)] mb-1">{t.media.bannerUpload}</p>
+              <BannerUploader role="model" initialUrl={user?.banner_url} t={t} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab-panel="gallery" class="hidden">
+      <div class="space-y-3">
+        <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+          {lang === 'ru' ? 'Галерея модели' : 'Model gallery'}
+        </h2>
+        <p class="text-sm text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Загружайте фотографии с съёмок, бэкстейджа и других материалов. Они отображаются на публичной странице.'
+            : 'Upload photos from shoots, backstage and other material. They appear on your public model page.'}
+        </p>
+        <GalleryUploader role="model" t={t} kind="portfolio" maxItems={24} />
+      </div>
+    </section>
+  </div>
+</DashboardLayout>
+
+<script>
+  const triggers = document.querySelectorAll('[data-tab-trigger]');
+  const panels = document.querySelectorAll('[data-tab-panel]');
+
+  function setActiveTab(name) {
+    triggers.forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab-trigger') === name;
+      btn.setAttribute('data-active', isActive ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.getAttribute('data-tab-panel') === name;
+      if (isActive) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    });
+  }
+
+  triggers.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.getAttribute('data-tab-trigger');
+      if (name) setActiveTab(name);
+    });
+  });
+</script>
+

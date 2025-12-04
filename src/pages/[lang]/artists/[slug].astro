@@ -1,0 +1,533 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
+import type { Lang, I18nSchema } from '../../../i18n/types';
+import { getApiUrl } from '../../../shared/config';
+
+export const prerender = false;
+
+export async function getStaticPaths() {
+  // Dynamic artists – we only predefine languages, slug is resolved at runtime.
+  return supportedLangs.map((lang) => ({
+    params: { lang, slug: 'placeholder' },
+  }));
+}
+
+interface PortfolioItem {
+  id: number;
+  url: string;
+  width: number;
+  height: number;
+  kind: 'portfolio' | 'wannado';
+  title?: string | null;
+  description?: string | null;
+  approx_price?: string | null;
+  placement?: string | null;
+}
+
+interface PublicArtistProfile {
+  username: string;
+  about?: string | null;
+  styles: string[];
+  city?: string | null;
+  session_price?: number | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  portfolio: PortfolioItem[];
+  wannado: PortfolioItem[];
+}
+
+const lang: Lang = resolveLangFromParams(Astro.params.lang);
+const t: I18nSchema = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const slugParam = Astro.params.slug as string;
+const apiUrl = getApiUrl();
+
+let profile: PublicArtistProfile | null = null;
+let notFound = false;
+let loadError: string | null = null;
+
+try {
+  const resp = await fetch(
+    `${apiUrl}/api/v1/public/artists/${encodeURIComponent(slugParam)}`
+  );
+
+  if (resp.ok) {
+    profile = (await resp.json()) as PublicArtistProfile;
+  } else if (resp.status === 404) {
+    notFound = true;
+  } else {
+    loadError = `HTTP ${resp.status} ${resp.statusText || ''}`.trim();
+  }
+} catch (error: any) {
+  loadError = error?.message || 'Network error';
+}
+
+if (loadError) {
+  // Log once for easier debugging in dev tools / server logs without spamming
+  console.log('[artist-profile] Failed to load artist profile', {
+    slug: slugParam,
+    error: loadError,
+  });
+}
+
+if (notFound || !profile) {
+  if (notFound) {
+    const message = lang === 'ru' ? 'Художник не найден' : 'Artist not found';
+    return new Response(message, {
+      status: 404,
+      statusText: message,
+    });
+  }
+
+  const genericMessage =
+    lang === 'ru' ? 'Не удалось загрузить профиль художника' : 'Failed to load artist profile';
+
+  return new Response(genericMessage, {
+    status: 500,
+    statusText: genericMessage,
+  });
+}
+
+const displayName = profile.username;
+const hasSocial = !!profile.instagram || !!profile.telegram;
+const hasStyles = profile.styles && profile.styles.length > 0;
+---
+<PublicLayout title={displayName} lang={lang} t={t} currentPath={currentPath}>
+  <!-- LinkedIn-style Header -->
+  <section class="mb-8 rounded-lg overflow-hidden border border-[var(--inkq-border)] bg-[var(--inkq-surface)]">
+    <div class="relative">
+      <!-- Banner -->
+      <div class="h-48 md:h-64 w-full overflow-hidden bg-[var(--inkq-bg-subtle)]">
+        <img
+          src={profile.banner_url || '/placeholder-banner.svg'}
+          alt="Banner"
+          class="w-full h-full object-cover"
+          loading="lazy"
+        />
+      </div>
+      
+      <!-- Avatar and Main Info -->
+      <div class="absolute -bottom-16 md:-bottom-20 left-4 md:left-6 flex items-end gap-4">
+        <div class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-[var(--inkq-surface)] bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={displayName}
+              class="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <span class="text-2xl md:text-3xl font-semibold text-[var(--inkq-muted)]">
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div class="pb-2">
+          <h1 class="text-xl md:text-2xl lg:text-3xl font-bold text-[var(--inkq-fg)]">
+            {displayName}
+          </h1>
+          <p class="text-sm text-[var(--inkq-muted)]">
+            {t.profile.roleArtist}
+            {profile.city ? ` • ${profile.city}` : ''}
+          </p>
+          {profile.session_price && (
+            <p class="text-sm text-[var(--inkq-fg)] mt-1">
+              {lang === 'ru'
+                ? `От ${profile.session_price} € за сеанс`
+                : `From ${profile.session_price} € per session`}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Bar -->
+    <div class="pt-20 md:pt-24 pb-4 px-4 md:px-6 lg:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-wrap gap-2">
+        {hasStyles ? (
+          profile.styles.map((style) => (
+            <span class="px-3 py-1 text-xs rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] uppercase tracking-wide">
+              {style}
+            </span>
+          ))
+        ) : (
+          <span class="text-xs text-[var(--inkq-muted)]">
+            {lang === 'ru' ? 'Стили не указаны' : 'Styles not specified'}
+          </span>
+        )}
+      </div>
+
+      {hasSocial && (
+        <div class="flex flex-wrap gap-3">
+          {profile.instagram && (
+            <a
+              href={
+                profile.instagram.startsWith('http')
+                  ? profile.instagram
+                  : `https://instagram.com/${profile.instagram.replace('@', '')}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>📸</span>
+              <span>Instagram</span>
+            </a>
+          )}
+          {profile.telegram && (
+            <a
+              href={
+                profile.telegram.startsWith('http')
+                  ? profile.telegram
+                  : `https://t.me/${profile.telegram.replace('@', '')}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>💬</span>
+              <span>Telegram</span>
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <div class="mb-4 border-b border-[var(--inkq-border)] flex gap-4">
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="about"
+      data-active="true"
+    >
+      {t.profile.aboutTitle}
+    </button>
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="portfolio"
+      data-active="false"
+    >
+      {t.profile.portfolioTitle}
+    </button>
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="wannado"
+      data-active="false"
+    >
+      {t.profile.wannadoTab}
+    </button>
+  </div>
+
+  <!-- About tab -->
+  <section data-tab-panel="about">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.aboutTitle}</h2>
+      {profile.about ? (
+        <p class="text-[var(--inkq-fg)] leading-relaxed whitespace-pre-wrap">{profile.about}</p>
+      ) : (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Художник ещё не заполнил раздел «О себе».'
+            : 'This artist has not added an about section yet.'}
+        </p>
+      )}
+      <div class="text-sm text-[var(--inkq-muted)] space-y-1">
+        <p>
+          <strong>{t.profile.cityLabel}:</strong>{' '}
+          {profile.city || (lang === 'ru' ? 'Не указан' : 'Not specified')}
+        </p>
+        {profile.session_price && (
+          <p>
+            <strong>{t.profile.sessionPriceLabel}:</strong>{' '}
+            {lang === 'ru'
+              ? `От ${profile.session_price} € за сеанс`
+              : `From ${profile.session_price} € per session`}
+          </p>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Portfolio tab -->
+  <section data-tab-panel="portfolio" class="hidden">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.portfolioTitle}</h2>
+      <div id="portfolio-content">
+        {profile.portfolio.length === 0 ? (
+          <p class="text-[var(--inkq-muted)]">
+            {lang === 'ru'
+              ? 'Нет работ в портфолио'
+              : 'No portfolio items yet.'}
+          </p>
+        ) : (
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {profile.portfolio.map((item) => {
+              const hasMetadata = !!(item.title || item.description || item.approx_price || item.placement);
+              return (
+                <button
+                  type="button"
+                  class="relative aspect-square overflow-hidden rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] group"
+                  data-lightbox-image={item.url}
+                  data-item-id={item.id}
+                >
+                  <img
+                    src={item.url}
+                    alt={item.title || 'Portfolio image'}
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    loading="lazy"
+                  />
+                  {hasMetadata && (
+                    <div
+                      class="absolute inset-0 bg-black/70 text-white p-3 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end"
+                      data-item-overlay={item.id}
+                    >
+                      {item.title && (
+                        <h4 class="font-semibold text-sm mb-1 line-clamp-1">{item.title}</h4>
+                      )}
+                      <div class="text-xs space-y-1">
+                        {item.approx_price && (
+                          <p>
+                            <span class="font-medium">{t.media.imageApproxPriceLabel}:</span>{' '}
+                            {item.approx_price}
+                          </p>
+                        )}
+                        {item.placement && (
+                          <p>
+                            <span class="font-medium">{t.media.imagePlacementLabel}:</span>{' '}
+                            {item.placement}
+                          </p>
+                        )}
+                        {item.description && (
+                          <p class="line-clamp-2 text-[var(--inkq-muted)]">{item.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Wannado tab -->
+  <section data-tab-panel="wannado" class="hidden">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.wannadoTab}</h2>
+      <div id="wannado-content">
+        {profile.wannado.length === 0 ? (
+          <p class="text-[var(--inkq-muted)]">
+            {lang === 'ru'
+              ? 'Нет эскизов в разделе «Хочу сделать»'
+              : 'No wanna-do designs yet.'}
+          </p>
+        ) : (
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {profile.wannado.map((item) => {
+              const hasMetadata = !!(item.title || item.description || item.approx_price || item.placement);
+              return (
+                <button
+                  type="button"
+                  class="relative aspect-square overflow-hidden rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] group"
+                  data-lightbox-image={item.url}
+                  data-item-id={item.id}
+                >
+                  <img
+                    src={item.url}
+                    alt={item.title || 'Wannado image'}
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    loading="lazy"
+                  />
+                  {hasMetadata && (
+                    <div
+                      class="absolute inset-0 bg-black/70 text-white p-3 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end"
+                      data-item-overlay={item.id}
+                    >
+                      {item.title && (
+                        <h4 class="font-semibold text-sm mb-1 line-clamp-1">{item.title}</h4>
+                      )}
+                      <div class="text-xs space-y-1">
+                        {item.approx_price && (
+                          <p>
+                            <span class="font-medium">{t.media.imageApproxPriceLabel}:</span>{' '}
+                            {item.approx_price}
+                          </p>
+                        )}
+                        {item.placement && (
+                          <p>
+                            <span class="font-medium">{t.media.imagePlacementLabel}:</span>{' '}
+                            {item.placement}
+                          </p>
+                        )}
+                        {item.description && (
+                          <p class="line-clamp-2 text-[var(--inkq-muted)]">{item.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Lightbox -->
+  <div
+    id="artist-lightbox"
+    class="fixed inset-0 bg-black/80 flex items-center justify-center z-40 opacity-0 pointer-events-none transition-opacity"
+  >
+    <button
+      type="button"
+      id="artist-lightbox-close"
+      class="absolute top-4 right-4 text-white text-2xl"
+      aria-label="Close"
+    >
+      ×
+    </button>
+    <img
+      id="artist-lightbox-image"
+      src=""
+      alt="Preview"
+      class="max-w-full max-h-[80vh] rounded-lg shadow-xl"
+    />
+  </div>
+</PublicLayout>
+
+<script define:vars={{ slug: slugParam, lang }}>
+  // Tabs
+  const triggers = document.querySelectorAll('[data-tab-trigger]');
+  const panels = document.querySelectorAll('[data-tab-panel]');
+
+  const VALID_TABS = ['about', 'portfolio', 'wannado'];
+
+  function setActiveTab(name, { updateUrl } = { updateUrl: false }) {
+    if (!VALID_TABS.includes(name)) return;
+
+    triggers.forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab-trigger') === name;
+      btn.setAttribute('data-active', isActive ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.getAttribute('data-tab-panel') === name;
+      if (isActive) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    });
+
+    if (updateUrl && typeof window !== 'undefined' && window.history && window.location) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', name);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+
+  // Initialize active tab from URL (?tab=about|portfolio|wannado) or default to "about"
+  (function initTabs() {
+    if (!triggers.length || !panels.length || typeof window === 'undefined') {
+      return;
+    }
+    const url = new URL(window.location.href);
+    const fromQuery = url.searchParams.get('tab');
+    const initialTab = VALID_TABS.includes(fromQuery || '') ? fromQuery : 'about';
+    setActiveTab(initialTab);
+  })();
+
+  triggers.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.getAttribute('data-tab-trigger');
+      if (name) setActiveTab(name, { updateUrl: true });
+    });
+  });
+
+  // Lightbox
+  const lightbox = document.getElementById('artist-lightbox');
+  const lightboxImage = document.getElementById('artist-lightbox-image');
+  const lightboxClose = document.getElementById('artist-lightbox-close');
+
+  function openLightbox(url) {
+    if (!lightbox || !lightboxImage) return;
+    lightboxImage.src = url;
+    lightbox.classList.remove('pointer-events-none');
+    lightbox.classList.add('opacity-100');
+  }
+
+  function closeLightbox() {
+    if (!lightbox || !lightboxImage) return;
+    lightbox.classList.add('pointer-events-none');
+    lightbox.classList.remove('opacity-100');
+    lightboxImage.src = '';
+  }
+
+  function attachLightboxHandlers() {
+    document.querySelectorAll('[data-lightbox-image]').forEach((el) => {
+      let overlayVisible = false;
+      let overlayTimeout = null;
+      const overlay = el.querySelector('[data-item-overlay]');
+      const url = el.getAttribute('data-lightbox-image');
+      
+      if (!url) return;
+
+      el.addEventListener('click', (e) => {
+        // If there's metadata and overlay isn't visible, show it (mobile tap behavior)
+        if (overlay && !overlayVisible) {
+          e.preventDefault();
+          e.stopPropagation();
+          overlay.classList.remove('opacity-0');
+          overlay.classList.add('opacity-100');
+          overlayVisible = true;
+          // Clear any existing timeout
+          if (overlayTimeout) clearTimeout(overlayTimeout);
+          // Hide overlay after 5 seconds
+          overlayTimeout = setTimeout(() => {
+            if (overlayVisible) {
+              overlayVisible = false;
+              overlay.classList.remove('opacity-100');
+              overlay.classList.add('opacity-0');
+            }
+          }, 5000);
+        } else {
+          // Second tap or no metadata - open lightbox
+          if (overlayTimeout) {
+            clearTimeout(overlayTimeout);
+            overlayTimeout = null;
+          }
+          openLightbox(url);
+          if (overlay) {
+            overlayVisible = false;
+            overlay.classList.remove('opacity-100');
+            overlay.classList.add('opacity-0');
+          }
+        }
+      });
+    });
+  }
+
+  attachLightboxHandlers();
+
+  if (lightboxClose) {
+    lightboxClose.addEventListener('click', closeLightbox);
+  }
+
+  if (lightbox) {
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+  }
+</script>
+

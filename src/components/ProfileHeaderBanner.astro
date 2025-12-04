@@ -1,0 +1,90 @@
+---
+import type { I18nSchema } from '../i18n/types';
+
+interface Props {
+  name: string;
+  city: string;
+  styles: string[];
+  roleLabel: string;
+  t: I18nSchema;
+}
+
+const { name, city, styles, roleLabel, t } = Astro.props;
+---
+
+<div class="relative mb-8">
+  <!-- Banner -->
+  <div class="h-48 bg-gradient-to-r from-[var(--inkq-gray-6)] to-[var(--inkq-gray-5)] rounded-t-lg"></div>
+
+  <!-- Avatar overlapping banner -->
+  <div class="absolute left-8 bottom-0 transform translate-y-1/2">
+    <div class="w-32 h-32 rounded-full bg-[var(--inkq-surface)] border-4 border-[var(--inkq-bg)] shadow-lg flex items-center justify-center text-4xl font-bold text-[var(--inkq-muted)]">
+      {name.charAt(0)}
+    </div>
+  </div>
+
+  <!-- Profile info below banner -->
+  <div class="pt-20 pb-6 px-8 bg-[var(--inkq-surface)] rounded-b-lg border border-[var(--inkq-border)] border-t-0">
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold mb-2 text-[var(--inkq-fg)]">{name}</h1>
+        <p class="text-lg text-[var(--inkq-muted)] mb-2">{roleLabel}</p>
+        <p class="text-sm text-[var(--inkq-muted)] mb-4">{city}</p>
+        <div class="flex flex-wrap gap-2">
+          {styles.map((style) => (
+            <span class="px-3 py-1 text-sm rounded-md bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]">
+              {style}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <!-- Social icons placeholder -->
+      <div class="flex gap-3">
+        <div class="w-10 h-10 rounded-full bg-[var(--inkq-bg-subtle)] flex items-center justify-center cursor-pointer hover:bg-[var(--inkq-border)] transition-colors">
+          <span class="text-[var(--inkq-muted)]">📱</span>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-[var(--inkq-bg-subtle)] flex items-center justify-center cursor-pointer hover:bg-[var(--inkq-border)] transition-colors">
+          <span class="text-[var(--inkq-muted)]">📷</span>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-[var(--inkq-bg-subtle)] flex items-center justify-center cursor-pointer hover:bg-[var(--inkq-border)] transition-colors">
+          <span class="text-[var(--inkq-muted)]">🌐</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Profile sections -->
+<div class="space-y-8">
+  <!-- About section -->
+  <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)]">
+    <h2 class="text-2xl font-bold mb-4 text-[var(--inkq-fg)]">{t.profile.aboutTitle}</h2>
+    <p class="text-[var(--inkq-fg)] leading-relaxed">
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+    </p>
+  </section>
+
+  <!-- Portfolio section -->
+  <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)]">
+    <h2 class="text-2xl font-bold mb-4 text-[var(--inkq-fg)]">{t.profile.portfolioTitle}</h2>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div class="aspect-square bg-[var(--inkq-bg-subtle)] rounded-lg flex items-center justify-center text-[var(--inkq-muted)]">
+          Image {i}
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Contact section -->
+  <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)]">
+    <h2 class="text-2xl font-bold mb-4 text-[var(--inkq-fg)]">{t.profile.contactTitle}</h2>
+    <div class="space-y-2 text-[var(--inkq-fg)]">
+      <p>Email: contact@example.com</p>
+      <p>Phone: +1 (555) 123-4567</p>
+      <p>Location: {city}</p>
+    </div>
+  </section>
+</div>
+

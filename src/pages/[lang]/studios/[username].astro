@@ -1,0 +1,356 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
+import type { Lang, I18nSchema } from '../../../i18n/types';
+import { callBackendJsonParse } from '../../../shared/api/client';
+
+export const prerender = false;
+
+export async function getStaticPaths() {
+  // Dynamic studios – we only predefine languages, slug is resolved at runtime.
+  return supportedLangs.map((lang) => ({
+    params: { lang, username: 'placeholder' },
+  }));
+}
+
+interface PublicStudioPortfolioItem {
+  id: number;
+  image_url: string;
+  width: number;
+  height: number;
+}
+
+interface PublicStudioTeamMember {
+  artist_id: number;
+  username: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  styles: string[];
+}
+
+interface PublicStudioInfo {
+  name?: string | null;
+  about?: string | null;
+  city?: string | null;
+  address?: string | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  vk?: string | null;
+  session_price_label?: string | null;
+}
+
+interface PublicStudioProfile {
+  studio: PublicStudioInfo;
+  username: string;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  gallery: PublicStudioPortfolioItem[];
+  team: PublicStudioTeamMember[];
+  aggregated_styles: string[];
+}
+
+const lang: Lang = resolveLangFromParams(Astro.params.lang);
+const t: I18nSchema = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const slugParam = Astro.params.username as string;
+
+let profile: PublicStudioProfile | null = null;
+let notFound = false;
+let errorMessage: string | null = null;
+
+try {
+  profile = await callBackendJsonParse<PublicStudioProfile>(`/api/v1/public/studios/${encodeURIComponent(slugParam)}`);
+} catch (error: any) {
+  if (error?.message === 'Studio not found' || error?.message?.includes('not found')) {
+    notFound = true;
+  } else {
+    notFound = true;
+    errorMessage = error?.message || 'Failed to load studio';
+  }
+}
+
+if (notFound || !profile) {
+  const message = errorMessage || t.profile.studioNotFound;
+  return new Response(message, {
+    status: 404,
+    statusText: message,
+  });
+}
+
+const studioName = profile.studio.name || profile.username;
+const hasSocial = !!profile.studio.instagram || !!profile.studio.telegram || !!profile.studio.vk;
+---
+
+<PublicLayout title={studioName} lang={lang} t={t} currentPath={currentPath}>
+  <section class="mb-8 rounded-lg overflow-hidden border border-[var(--inkq-border)] bg-[var(--inkq-surface)]">
+    <div class="relative">
+      <div class="h-48 md:h-56 w-full overflow-hidden bg-[var(--inkq-bg-subtle)]">
+        <img
+          src={profile.banner_url || '/placeholder-banner.svg'}
+          alt="Banner"
+          class="w-full h-full object-cover"
+        />
+      </div>
+      <div class="absolute -bottom-10 left-6 flex items-end gap-4">
+        <div class="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-[var(--inkq-surface)] bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={studioName}
+              class="w-full h-full object-cover"
+            />
+          ) : (
+            <span class="text-2xl font-semibold text-[var(--inkq-muted)]">
+              {studioName.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div class="pb-2">
+          <h1 class="text-2xl md:text-3xl font-bold text-[var(--inkq-fg)]">
+            {studioName}
+          </h1>
+          <p class="text-sm text-[var(--inkq-muted)]">
+            {t.profile.roleStudio}
+            {profile.studio.city ? ` • ${profile.studio.city}` : ''}
+          </p>
+          {profile.studio.address && (
+            <p class="text-xs text-[var(--inkq-muted)] mt-1">
+              {profile.studio.address}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-14 pb-4 px-6 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-wrap gap-2">
+        {profile.aggregated_styles.length > 0 ? (
+          profile.aggregated_styles.map((style) => (
+            <span class="px-3 py-1 text-xs rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]">
+              {style}
+            </span>
+          ))
+        ) : (
+          <span class="text-xs text-[var(--inkq-muted)]">
+            {lang === 'ru' ? 'Стили не указаны' : 'Styles not specified'}
+          </span>
+        )}
+      </div>
+
+      {hasSocial && (
+        <div class="flex flex-wrap gap-3">
+          {profile.studio.instagram && (
+            <a
+              href={profile.studio.instagram.startsWith('http') ? profile.studio.instagram : `https://instagram.com/${profile.studio.instagram.replace('@', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>📸</span>
+              <span>Instagram</span>
+            </a>
+          )}
+          {profile.studio.telegram && (
+            <a
+              href={profile.studio.telegram.startsWith('http') ? profile.studio.telegram : `https://t.me/${profile.studio.telegram.replace('@', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>💬</span>
+              <span>Telegram</span>
+            </a>
+          )}
+          {profile.studio.vk && (
+            <a
+              href={profile.studio.vk.startsWith('http') ? profile.studio.vk : `https://vk.com/${profile.studio.vk.replace('@', '').replace('vk.com/', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+            >
+              <span>🔵</span>
+              <span>VK</span>
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[1.5fr,2fr] gap-8 items-start">
+    <!-- About -->
+    <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)] space-y-3">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.aboutTitle}</h2>
+      {profile.studio.about ? (
+        <p class="text-[var(--inkq-fg)] leading-relaxed whitespace-pre-wrap">
+          {profile.studio.about}
+        </p>
+      ) : (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Студия ещё не заполнила раздел «О себе».'
+            : 'This studio has not added an about section yet.'}
+        </p>
+      )}
+      <div class="text-sm text-[var(--inkq-muted)] space-y-1">
+        <p>
+          <strong>{t.profile.cityLabel}:</strong>{' '}
+          {profile.studio.city || (lang === 'ru' ? 'Не указан' : 'Not specified')}
+        </p>
+        {profile.studio.address && (
+          <p>
+            <strong>{lang === 'ru' ? 'Адрес' : 'Address'}:</strong>{' '}
+            {profile.studio.address}
+          </p>
+        )}
+        {profile.studio.session_price_label && (
+          <p>
+            <strong>{lang === 'ru' ? 'Цены' : 'Pricing'}:</strong>{' '}
+            {profile.studio.session_price_label}
+          </p>
+        )}
+      </div>
+    </section>
+
+    <!-- Gallery -->
+    <section class="bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)] space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.portfolioTitle}</h2>
+      {profile.gallery.length === 0 ? (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Студия ещё не добавила фотографии в галерею.'
+            : 'This studio has not added any photos to the gallery yet.'}
+        </p>
+      ) : (
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {profile.gallery.map((item) => (
+            <button
+              type="button"
+              class="relative aspect-square overflow-hidden rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] group"
+              data-lightbox-image={item.image_url}
+            >
+              <img
+                src={item.image_url}
+                alt="Gallery image"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  </div>
+
+  <!-- Team Section -->
+  {profile.team.length > 0 && (
+    <section class="mt-8 bg-[var(--inkq-surface)] rounded-lg p-6 border border-[var(--inkq-border)] space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+        {t.profile.teamTitle}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {profile.team.map((member) => (
+          <a
+            href={`/${lang}/artists/${member.username}`}
+            class="block p-4 rounded-lg border border-[var(--inkq-border)] hover:border-[var(--inkq-muted)] transition-colors"
+          >
+            <div class="flex items-center gap-3 mb-2">
+              {member.avatar_url ? (
+                <img
+                  src={member.avatar_url}
+                  alt={member.display_name || member.username}
+                  class="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div class="w-12 h-12 rounded-full bg-[var(--inkq-bg-subtle)] flex items-center justify-center text-lg font-semibold text-[var(--inkq-muted)]">
+                  {(member.display_name || member.username).charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <h3 class="font-semibold text-[var(--inkq-fg)]">
+                  {member.display_name || member.username}
+                </h3>
+                <p class="text-xs text-[var(--inkq-muted)]">@{member.username}</p>
+              </div>
+            </div>
+            {member.styles.length > 0 && (
+              <div class="flex flex-wrap gap-1 mt-2">
+                {member.styles.slice(0, 3).map((style) => (
+                  <span class="px-2 py-0.5 text-xs rounded bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]">
+                    {style}
+                  </span>
+                ))}
+                {member.styles.length > 3 && (
+                  <span class="px-2 py-0.5 text-xs text-[var(--inkq-muted)]">
+                    +{member.styles.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
+
+  <!-- Lightbox -->
+  <div
+    id="studio-lightbox"
+    class="fixed inset-0 bg-black/80 flex items-center justify-center z-40 opacity-0 pointer-events-none transition-opacity"
+  >
+    <button
+      type="button"
+      id="studio-lightbox-close"
+      class="absolute top-4 right-4 text-white text-2xl"
+      aria-label="Close"
+    >
+      ×
+    </button>
+    <img
+      id="studio-lightbox-image"
+      src=""
+      alt="Preview"
+      class="max-w-full max-h-[80vh] rounded-lg shadow-xl"
+    />
+  </div>
+</PublicLayout>
+
+<script>
+  // Lightbox
+  const lightbox = document.getElementById('studio-lightbox');
+  const lightboxImage = document.getElementById('studio-lightbox-image');
+  const lightboxClose = document.getElementById('studio-lightbox-close');
+
+  function openLightbox(url) {
+    if (!lightbox || !lightboxImage) return;
+    lightboxImage.src = url;
+    lightbox.classList.remove('pointer-events-none');
+    lightbox.classList.add('opacity-100');
+  }
+
+  function closeLightbox() {
+    if (!lightbox || !lightboxImage) return;
+    lightbox.classList.add('pointer-events-none');
+    lightbox.classList.remove('opacity-100');
+    lightboxImage.src = '';
+  }
+
+  document.querySelectorAll('[data-lightbox-image]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const url = el.getAttribute('data-lightbox-image');
+      if (url) openLightbox(url);
+    });
+  });
+
+  if (lightboxClose) {
+    lightboxClose.addEventListener('click', closeLightbox);
+  }
+
+  if (lightbox) {
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+  }
+</script>

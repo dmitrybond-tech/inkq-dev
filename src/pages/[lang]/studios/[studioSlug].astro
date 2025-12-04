@@ -1,0 +1,642 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
+import { getApiUrl } from '../../../shared/config';
+
+export const prerender = false;
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const apiUrl = getApiUrl();
+const studioSlug = Astro.params.studioSlug;
+
+interface PublicStudioResponse {
+  studio: {
+    name?: string | null;
+    about?: string | null;
+    city?: string | null;
+    address?: string | null;
+    instagram?: string | null;
+    telegram?: string | null;
+    vk?: string | null;
+    session_price_label?: string | null;
+  };
+  username: string;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  gallery: Array<{ id: number; image_url: string; width: number; height: number }>;
+  team: Array<{
+    artist_id: number;
+    username: string;
+    display_name?: string | null;
+    avatar_url?: string | null;
+    styles: string[];
+  }>;
+  aggregated_styles: string[];
+}
+
+let studioData: PublicStudioResponse | null = null;
+let notFound = false;
+
+if (!studioSlug) {
+  notFound = true;
+} else {
+  try {
+    const resp = await fetch(`${apiUrl}/api/v1/public/studios/${studioSlug}`);
+    if (resp.ok) {
+      studioData = (await resp.json()) as PublicStudioResponse;
+    } else if (resp.status === 404) {
+      notFound = true;
+    }
+  } catch {
+    notFound = true;
+  }
+}
+
+if (notFound || !studioData) {
+  return new Response(lang === 'ru' ? 'Студия не найдена' : 'Studio not found', {
+    status: 404,
+    statusText: 'Studio not found',
+  });
+}
+
+const studio = studioData.studio;
+const styles = studioData.aggregated_styles || [];
+---
+
+<PublicLayout title={studio.name || studioData.username} lang={lang} t={t} currentPath={currentPath}>
+  <!-- Hero -->
+  <section class="mb-8 rounded-lg overflow-hidden border border-[var(--inkq-border)] bg-[var(--inkq-surface)]">
+    <div class="relative">
+      <div class="h-48 md:h-56 w-full overflow-hidden bg-[var(--inkq-bg-subtle)]">
+        <img
+          src={studioData.banner_url || '/placeholder-banner.svg'}
+          alt="Banner"
+          class="w-full h-full object-cover"
+        />
+      </div>
+      <div class="absolute -bottom-10 left-6 flex items-end gap-4">
+        <div class="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-[var(--inkq-surface)] bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center">
+          <img
+            src={studioData.avatar_url || '/placeholder-avatar.svg'}
+            alt={studio.name || studioData.username}
+            class="w-full h-full object-cover"
+          />
+        </div>
+        <div class="pb-2">
+          <h1 class="text-2xl md:text-3xl font-bold text-[var(--inkq-fg)]">
+            {studio.name || studioData.username}
+          </h1>
+          <p class="text-sm text-[var(--inkq-muted)]">
+            {t.profile.roleStudio}
+            {studio.city ? ` • ${studio.city}` : ''}
+          </p>
+          {studio.session_price_label && (
+            <p class="text-sm text-[var(--inkq-fg)] mt-1">
+              {studio.session_price_label}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-14 pb-4 px-6 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-wrap gap-2">
+        {styles.length > 0 ? (
+          styles.map((style) => (
+            <span class="px-3 py-1 text-xs rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]">
+              {style}
+            </span>
+          ))
+        ) : (
+          <span class="text-xs text-[var(--inkq-muted)]">
+            {lang === 'ru' ? 'Стили не указаны' : 'Styles not specified'}
+          </span>
+        )}
+      </div>
+
+      <div class="flex flex-wrap gap-3">
+        {studio.instagram && (
+          <a
+            href={studio.instagram.startsWith('http') ? studio.instagram : `https://instagram.com/${studio.instagram.replace('@', '')}`}
+            target="_blank"
+            rel="noreferrer"
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+          >
+            <span>📸</span>
+            <span>Instagram</span>
+          </a>
+        )}
+        {studio.telegram && (
+          <a
+            href={studio.telegram.startsWith('http') ? studio.telegram : `https://t.me/${studio.telegram.replace('@', '')}`}
+            target="_blank"
+            rel="noreferrer"
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+          >
+            <span>💬</span>
+            <span>Telegram</span>
+          </a>
+        )}
+        {studio.vk && (
+          <a
+            href={studio.vk}
+            target="_blank"
+            rel="noreferrer"
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] text-xs hover:bg-[var(--inkq-border)] transition-colors"
+          >
+            <span>🕸</span>
+            <span>VK</span>
+          </a>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <div class="mb-4 border-b border-[var(--inkq-border)] flex gap-4">
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="about"
+      data-active="true"
+    >
+      {t.profile.aboutTitle}
+    </button>
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="gallery"
+      data-active="false"
+    >
+      {t.profile.portfolioTitle}
+    </button>
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="reviews"
+      data-active="false"
+    >
+      {lang === 'ru' ? 'Отзывы' : 'Reviews'}
+    </button>
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="booking"
+      data-active="false"
+    >
+      {lang === 'ru' ? 'Бронирование' : 'Booking'}
+    </button>
+    <button
+      type="button"
+      class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-[var(--inkq-muted)] data-[active='true']:border-[var(--inkq-fg)] data-[active='true']:text-[var(--inkq-fg)]"
+      data-tab-trigger="team"
+      data-active="false"
+    >
+      {lang === 'ru' ? 'Команда' : 'Team'}
+    </button>
+  </div>
+
+  <!-- About -->
+  <section data-tab-panel="about">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">{t.profile.aboutTitle}</h2>
+      {studio.about ? (
+        <p class="text-[var(--inkq-fg)] leading-relaxed whitespace-pre-wrap">
+          {studio.about}
+        </p>
+      ) : (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Студия ещё не добавила описание.'
+            : 'This studio has not added an about section yet.'}
+        </p>
+      )}
+      <div class="text-sm text-[var(--inkq-muted)] space-y-1">
+        <p>
+          <strong>{t.profile.cityLabel}:</strong>{' '}
+          {studio.city || (lang === 'ru' ? 'Не указан' : 'Not specified')}
+        </p>
+        <p>
+          <strong>{lang === 'ru' ? 'Адрес:' : 'Address:'}</strong>{' '}
+          {studio.address || (lang === 'ru' ? 'Не указан' : 'Not specified')}
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gallery -->
+  <section data-tab-panel="gallery" class="hidden">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'Галерея студии' : 'Studio gallery'}
+      </h2>
+      {studioData.gallery.length === 0 ? (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Студия ещё не добавила фотографии пространства.'
+            : 'This studio has not added any gallery images yet.'}
+        </p>
+      ) : (
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {studioData.gallery.map((item) => (
+            <button
+              type="button"
+              class="relative aspect-square overflow-hidden rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] group"
+              data-lightbox-image={item.image_url}
+            >
+              <img
+                src={item.image_url}
+                alt="Studio image"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- Reviews (stub) -->
+  <section data-tab-panel="reviews" class="hidden">
+    <div class="space-y-3">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'Отзывы' : 'Reviews'}
+      </h2>
+      <p class="text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Раздел отзывов скоро появится. Следите за обновлениями 💫'
+          : 'Reviews are coming soon. Stay tuned 💫'}
+      </p>
+    </div>
+  </section>
+
+  <!-- Booking -->
+  <section data-tab-panel="booking" class="hidden">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'Отправить заявку' : 'Send a booking request'}
+      </h2>
+      <p class="text-sm text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Оставьте свои контакты и кратко опишите идею татуировки. Студия свяжется с вами для уточнения деталей.'
+          : 'Leave your contact details and briefly describe your tattoo idea. The studio will contact you to confirm details.'}
+      </p>
+
+      <form id="studio-booking-form" class="space-y-4">
+        <div class="space-y-2">
+          <span class="block text-sm font-medium text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Тип заявки' : 'Request type'}
+          </span>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <label class="inline-flex items-center gap-2 text-sm text-[var(--inkq-fg)]">
+              <input
+                type="radio"
+                name="type"
+                value="general"
+                checked
+                class="h-4 w-4 rounded border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]"
+              />
+              <span>{lang === 'ru' ? 'Общая заявка' : 'General request'}</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-[var(--inkq-fg)]">
+              <input
+                type="radio"
+                name="type"
+                value="artist_specific"
+                class="h-4 w-4 rounded border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]"
+              />
+              <span>{lang === 'ru' ? 'Конкретный мастер' : 'Specific artist'}</span>
+            </label>
+          </div>
+        </div>
+
+        {studioData.team.length > 0 && (
+          <div class="space-y-2" id="studio-booking-artist-field" data-visible="false">
+            <label for="booking-artist-id" class="block text-sm font-medium text-[var(--inkq-fg)]">
+              {lang === 'ru' ? 'Выберите мастера' : 'Choose artist'}
+            </label>
+            <select
+              id="booking-artist-id"
+              name="artist_id"
+              class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            >
+              <option value="">{lang === 'ru' ? 'Выберите мастера' : 'Select artist'}</option>
+              {studioData.team.map((member) => (
+                <option value={member.artist_id}>
+                  {member.display_name || member.username}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label for="booking-client-name" class="block text-sm font-medium text-[var(--inkq-fg)]">
+              {lang === 'ru' ? 'Ваше имя' : 'Your name'}
+              <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="booking-client-name"
+              name="client_name"
+              type="text"
+              required
+              class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            />
+          </div>
+          <div class="space-y-2">
+            <label for="booking-client-contact" class="block text-sm font-medium text-[var(--inkq-fg)]">
+              {lang === 'ru' ? 'Контакт для связи' : 'Contact details'}
+              <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="booking-client-contact"
+              name="client_contact"
+              type="text"
+              required
+              placeholder={lang === 'ru' ? 'Телефон, email или соцсеть' : 'Phone, email or social handle'}
+              class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+            />
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label for="booking-comment" class="block text-sm font-medium text-[var(--inkq-fg)]">
+            {lang === 'ru' ? 'Комментарий (необязательно)' : 'Comment (optional)'}
+          </label>
+          <textarea
+            id="booking-comment"
+            name="comment"
+            class="w-full min-h-[100px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+          ></textarea>
+        </div>
+
+        <div id="studio-booking-message" class="text-sm text-[var(--inkq-muted)]"></div>
+
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+        >
+          {lang === 'ru' ? 'Отправить заявку' : 'Submit request'}
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Team -->
+  <section data-tab-panel="team" class="hidden">
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'Команда студии' : 'Studio team'}
+      </h2>
+      {studioData.team.length === 0 ? (
+        <p class="text-[var(--inkq-muted)]">
+          {lang === 'ru'
+            ? 'Студия ещё не добавила команду. Загляните позже.'
+            : 'This studio has not added its team yet. Check back later.'}
+        </p>
+      ) : (
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {studioData.team.map((member) => (
+            <a
+              href={`/${lang}/artists/${member.username}`}
+              class="block bg-[var(--inkq-surface)] rounded-lg border border-[var(--inkq-border)] p-4 hover:border-[var(--inkq-muted)] transition-colors"
+            >
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-full bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center text-sm">
+                  {member.avatar_url ? (
+                    <img
+                      src={member.avatar_url}
+                      alt={member.display_name || member.username}
+                      class="w-full h-full object-cover"
+                    />
+                  ) : (
+                    (member.display_name || member.username || '?').slice(0, 1)
+                  )}
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-[var(--inkq-fg)]">
+                    {member.display_name || member.username}
+                  </div>
+                  <div class="text-xs text-[var(--inkq-muted)]">@{member.username}</div>
+                </div>
+              </div>
+              {member.styles.length > 0 && (
+                <div class="flex flex-wrap gap-1">
+                  {member.styles.slice(0, 4).map((style) => (
+                    <span class="px-2 py-0.5 text-[10px] rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)]">
+                      {style}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- Lightbox -->
+  <div
+    id="studio-lightbox"
+    class="fixed inset-0 bg-black/80 flex items-center justify-center z-40 opacity-0 pointer-events-none transition-opacity"
+  >
+    <button
+      type="button"
+      id="studio-lightbox-close"
+      class="absolute top-4 right-4 text-white text-2xl"
+      aria-label="Close"
+    >
+      ×
+    </button>
+    <img
+      id="studio-lightbox-image"
+      src=""
+      alt="Preview"
+      class="max-w-full max-h-[80vh] rounded-lg shadow-xl"
+    />
+  </div>
+</PublicLayout>
+
+<script define:vars={{ apiUrl, studioSlug, lang }}>
+  // Tabs
+  const triggers = document.querySelectorAll('[data-tab-trigger]');
+  const panels = document.querySelectorAll('[data-tab-panel]');
+
+  function setActiveTab(name) {
+    triggers.forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab-trigger') === name;
+      btn.setAttribute('data-active', isActive ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.getAttribute('data-tab-panel') === name;
+      if (isActive) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    });
+  }
+
+  triggers.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.getAttribute('data-tab-trigger');
+      if (name) setActiveTab(name);
+    });
+  });
+
+  // Lightbox
+  const lightbox = document.getElementById('studio-lightbox');
+  const lightboxImage = document.getElementById('studio-lightbox-image');
+  const lightboxClose = document.getElementById('studio-lightbox-close');
+
+  function openLightbox(url) {
+    if (!lightbox || !lightboxImage) return;
+    lightboxImage.src = url;
+    lightbox.classList.remove('pointer-events-none');
+    lightbox.classList.add('opacity-100');
+  }
+
+  function closeLightbox() {
+    if (!lightbox || !lightboxImage) return;
+    lightbox.classList.add('pointer-events-none');
+    lightbox.classList.remove('opacity-100');
+    lightboxImage.src = '';
+  }
+
+  document.querySelectorAll('[data-lightbox-image]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const url = el.getAttribute('data-lightbox-image');
+      if (url) openLightbox(url);
+    });
+  });
+
+  if (lightboxClose) {
+    lightboxClose.addEventListener('click', closeLightbox);
+  }
+
+  if (lightbox) {
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+  }
+
+  // Booking form
+  const bookingForm = document.getElementById('studio-booking-form');
+  const bookingMessage = document.getElementById('studio-booking-message');
+  const artistField = document.getElementById('studio-booking-artist-field');
+
+  function updateArtistFieldVisibility() {
+    if (!artistField) return;
+    const typeInputSpecific = document.querySelector('input[name="type"][value="artist_specific"]');
+    const typeInputGeneral = document.querySelector('input[name="type"][value="general"]');
+    const specificChecked = typeInputSpecific && typeInputSpecific.checked;
+    if (specificChecked) {
+      artistField.classList.remove('hidden');
+      artistField.setAttribute('data-visible', 'true');
+    } else {
+      artistField.classList.add('hidden');
+      artistField.setAttribute('data-visible', 'false');
+    }
+  }
+
+  const typeRadios = document.querySelectorAll('input[name="type"]');
+  typeRadios.forEach((radio) => {
+    radio.addEventListener('change', updateArtistFieldVisibility);
+  });
+  updateArtistFieldVisibility();
+
+  async function handleBookingSubmit(event) {
+    event.preventDefault();
+    if (!bookingForm || !bookingMessage) return;
+
+    const formData = new FormData(bookingForm);
+    const type = (formData.get('type') || 'general').toString();
+    const client_name = (formData.get('client_name') || '').toString().trim();
+    const client_contact = (formData.get('client_contact') || '').toString().trim();
+    const comment = (formData.get('comment') || '').toString().trim() || null;
+
+    if (!client_name || !client_contact) {
+      bookingMessage.textContent =
+        lang === 'ru'
+          ? 'Пожалуйста, укажите имя и контакт для связи.'
+          : 'Please provide your name and contact details.';
+      bookingMessage.className = 'text-sm text-red-500';
+      return;
+    }
+
+    let artist_id = null;
+    if (type === 'artist_specific') {
+      const artistSelect = document.getElementById('booking-artist-id');
+      const value = artistSelect && 'value' in artistSelect ? artistSelect.value : '';
+      if (!value) {
+        bookingMessage.textContent =
+          lang === 'ru'
+            ? 'Пожалуйста, выберите мастера или смените тип заявки на «Общая».'
+            : 'Please choose an artist or switch request type to General.';
+        bookingMessage.className = 'text-sm text-red-500';
+        return;
+      }
+      artist_id = Number(value);
+    }
+
+    const payload = {
+      type,
+      client_name,
+      client_contact,
+      comment,
+      artist_id,
+    };
+
+    try {
+      bookingMessage.textContent =
+        lang === 'ru' ? 'Отправка заявки…' : 'Submitting request…';
+      bookingMessage.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const resp = await fetch(`${apiUrl}/api/v1/public/studios/${studioSlug}/booking`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({ detail: 'Error' }));
+        bookingMessage.textContent =
+          errorData.detail ||
+          (lang === 'ru'
+            ? 'Не удалось отправить заявку.'
+            : 'Failed to submit booking request.');
+        bookingMessage.className = 'text-sm text-red-500';
+        return;
+      }
+
+      bookingMessage.textContent =
+        lang === 'ru'
+          ? 'Заявка отправлена. Студия свяжется с вами в ближайшее время.'
+          : 'Request sent. The studio will contact you soon.';
+      bookingMessage.className = 'text-sm text-green-500';
+      bookingForm.reset();
+      updateArtistFieldVisibility();
+    } catch (error) {
+      console.error('Failed to submit booking request', error);
+      bookingMessage.textContent =
+        lang === 'ru'
+          ? 'Ошибка при отправке заявки.'
+          : 'Error while submitting booking request.';
+      bookingMessage.className = 'text-sm text-red-500';
+    }
+  }
+
+  if (bookingForm && typeof bookingForm.addEventListener === 'function') {
+    bookingForm.addEventListener('submit', handleBookingSubmit);
+  }
+</script>
+
+

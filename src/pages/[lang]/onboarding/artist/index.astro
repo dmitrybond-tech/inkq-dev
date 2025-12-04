@@ -1,0 +1,344 @@
+---
+import DashboardLayout from '../../../../layouts/DashboardLayout.astro';
+import AvatarUploader from '../../../../components/AvatarUploader.astro';
+import BannerUploader from '../../../../components/BannerUploader.astro';
+import GalleryUploader from '../../../../components/GalleryUploader.astro';
+import ArtistProfileForm from '../../../../components/ArtistProfileForm.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../../i18n/index';
+import { getApiUrl } from '../../../../shared/config';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const user = Astro.locals.user;
+const sessionToken = Astro.locals.sessionToken;
+const apiUrl = getApiUrl();
+---
+
+<DashboardLayout title={t.onboarding.title} lang={lang} t={t} currentPath={currentPath}>
+  <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)] space-y-6">
+    <header class="flex flex-col gap-2">
+      <h1 class="text-3xl font-bold text-[var(--inkq-fg)]">{t.onboarding.title}</h1>
+      <p class="text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Пройдите эти шаги, чтобы настроить профиль мастера и появиться в каталоге InkQ.'
+          : 'Follow these steps to set up your artist profile and appear in the InkQ catalog.'}
+      </p>
+      <p class="text-xs text-[var(--inkq-muted)]">
+        {lang === 'ru'
+          ? 'Онбординг можно завершить позже — данные сохраняются по мере заполнения.'
+          : 'You can finish onboarding later — your data is saved as you go.'}
+      </p>
+    </header>
+
+    <div id="onboarding-global-message" class="text-sm text-[var(--inkq-muted)]"></div>
+
+    <div class="space-y-8">
+      <!-- Step 1: About & meta -->
+      <section
+        class="flex items-start gap-4 p-6 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+        data-onboarding-step="1"
+      >
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--inkq-fg)] text-[var(--inkq-bg)] flex items-center justify-center font-bold">
+          1
+        </div>
+        <div class="flex-1 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--inkq-fg)]">{t.onboarding.stepAboutMeta}</h3>
+              <p class="text-sm text-[var(--inkq-muted)]">
+                {lang === 'ru'
+                  ? 'Расскажите о себе, выберите стили и укажите город.'
+                  : 'Tell clients about yourself, choose your styles, and set your city.'}
+              </p>
+            </div>
+            <p class="text-xs text-[var(--inkq-muted)]">Step 1 / 4</p>
+          </div>
+
+          <ArtistProfileForm lang={lang} t={t} sessionToken={sessionToken} />
+        </div>
+      </section>
+
+      <!-- Step 2: Avatar & banner -->
+      <section
+        class="flex items-start gap-4 p-6 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+        data-onboarding-step="2"
+      >
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--inkq-fg)] text-[var(--inkq-bg)] flex items-center justify-center font-bold">
+          2
+        </div>
+        <div class="flex-1 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--inkq-fg)]">{t.onboarding.stepAvatarBanner}</h3>
+              <p class="text-sm text-[var(--inkq-muted)]">
+                {lang === 'ru'
+                  ? 'Загрузите аватар и баннер, чтобы профиль выглядел живым.'
+                  : 'Upload your avatar and banner to make your profile stand out.'}
+              </p>
+            </div>
+            <p class="text-xs text-[var(--inkq-muted)]">Step 2 / 4</p>
+          </div>
+
+          <div class="space-y-6 mt-2">
+            <div>
+              <h4 class="text-sm font-medium mb-2 text-[var(--inkq-fg)]">{t.media.avatarUpload}</h4>
+              <AvatarUploader role="artist" initialUrl={user?.avatar_url} t={t} />
+            </div>
+            <div>
+              <h4 class="text-sm font-medium mb-2 text-[var(--inkq-fg)]">{t.media.bannerUpload}</h4>
+              <p class="text-xs text-[var(--inkq-muted)] mb-2">
+                {lang === 'ru'
+                  ? 'Рекомендуемый формат: соотношение сторон 4:1, без важного текста по краям.'
+                  : 'Recommended: 4:1 aspect ratio, avoid important text near the edges.'}
+              </p>
+              <BannerUploader role="artist" initialUrl={user?.banner_url} t={t} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: Portfolio -->
+      <section
+        class="flex items-start gap-4 p-6 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+        data-onboarding-step="3"
+      >
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--inkq-fg)] text-[var(--inkq-bg)] flex items-center justify-center font-bold">
+          3
+        </div>
+        <div class="flex-1 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--inkq-fg)]">{t.onboarding.stepPortfolio}</h3>
+              <p class="text-sm text-[var(--inkq-muted)]">{t.onboarding.portfolioHint}</p>
+            </div>
+            <p class="text-xs text-[var(--inkq-muted)]">Step 3 / 4</p>
+          </div>
+
+          <GalleryUploader role="artist" t={t} kind="portfolio" maxItems={10} />
+        </div>
+      </section>
+
+      <!-- Step 4: Wannado -->
+      <section
+        class="flex items-start gap-4 p-6 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+        data-onboarding-step="4"
+      >
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--inkq-fg)] text-[var(--inkq-bg)] flex items-center justify-center font-bold">
+          4
+        </div>
+        <div class="flex-1 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--inkq-fg)]">{t.onboarding.stepWannado}</h3>
+              <p class="text-sm text-[var(--inkq-muted)]">{t.onboarding.wannadoHint}</p>
+            </div>
+            <p class="text-xs text-[var(--inkq-muted)]">Step 4 / 4</p>
+          </div>
+
+          <GalleryUploader role="artist" t={t} kind="wannado" />
+
+          <div class="pt-4 border-t border-dashed border-[var(--inkq-border)] flex flex-col items-start gap-3">
+            <button
+              type="button"
+              id="finish-onboarding-button"
+              class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+            >
+              {t.onboarding.finishOnboarding}
+            </button>
+            <p class="text-xs text-[var(--inkq-muted)]">
+              {lang === 'ru'
+                ? 'Вы всегда сможете изменить профиль и добавить новые работы из панели мастера.'
+                : 'You can always update your profile and add more work later from the dashboard.'}
+            </p>
+            <div id="finish-onboarding-message" class="text-sm text-[var(--inkq-muted)]"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script define:vars={{ apiUrl, lang }}>
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  async function focusFirstIncompleteStep() {
+    const { headers, token } = buildAuthHeaders();
+    const messageEl = document.getElementById('onboarding-global-message');
+
+    // If there's no token yet (e.g. user is just browsing public pages),
+    // silently skip onboarding step resolution instead of showing an error.
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/artists/me`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Error' }));
+
+        const isAuthError =
+          response.status === 401 ||
+          (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+
+        // Only show auth error if it's a real 401, not on initial page load
+        // The middleware should have already handled redirects for invalid sessions
+        if (isAuthError && messageEl) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Сессия истекла. Пожалуйста, войдите снова.'
+              : 'Session expired. Please sign in again.';
+          messageEl.className = 'text-sm text-red-500';
+        }
+
+        return;
+      }
+
+      const data = await response.json();
+      const step = data?.steps?.first_incomplete_step || 1;
+      const section = document.querySelector(
+        `[data-onboarding-step="${step}"]`
+      );
+      if (section && section.scrollIntoView) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        section.classList.add('ring-2', 'ring-[var(--inkq-fg)]');
+        setTimeout(() => {
+          section.classList.remove('ring-2', 'ring-[var(--inkq-fg)]');
+        }, 2500);
+      }
+    } catch (error) {
+      console.error('Failed to resolve onboarding step', error);
+    }
+  }
+
+  async function finishOnboarding() {
+    const button = document.getElementById('finish-onboarding-button');
+    const messageEl = document.getElementById('finish-onboarding-message');
+
+    if (!button || !messageEl) return;
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    if (!token) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Нет активной сессии. Пожалуйста, войдите снова.'
+          : 'No active session. Please sign in again.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    try {
+      button.disabled = true;
+      messageEl.textContent =
+        lang === 'ru' ? 'Завершение онбординга…' : 'Finishing onboarding…';
+      messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const response = await fetch(`${apiUrl}/api/v1/artists/me`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ onboarding_completed: true }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Error' }));
+
+        const isAuthError =
+          response.status === 401 ||
+          (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+
+        if (isAuthError) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Сессия истекла. Пожалуйста, войдите снова.'
+              : 'Session expired. Please sign in again.';
+          messageEl.className = 'text-sm text-red-500';
+          button.disabled = false;
+          return;
+        } else {
+          messageEl.textContent =
+            (errorData && errorData.detail) ||
+            (lang === 'ru'
+              ? 'Не удалось завершить онбординг'
+              : 'Failed to finish onboarding');
+        }
+
+        messageEl.className = 'text-sm text-red-500';
+        button.disabled = false;
+        return;
+      }
+
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Онбординг завершён, перенаправление в панель мастера…'
+          : 'Onboarding completed, redirecting to your dashboard…';
+      messageEl.className = 'text-sm text-green-500';
+
+      const target = `/${lang}/dashboard/artist`;
+      setTimeout(() => {
+        window.location.href = target;
+      }, 800);
+    } catch (error) {
+      console.error('Failed to finish onboarding', error);
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Ошибка при завершении онбординга'
+          : 'Error while finishing onboarding';
+      messageEl.className = 'text-sm text-red-500';
+      button.disabled = false;
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => {
+      focusFirstIncompleteStep();
+      const button = document.getElementById('finish-onboarding-button');
+      if (button && typeof button.addEventListener === 'function') {
+        button.addEventListener('click', finishOnboarding);
+      }
+    });
+  }
+</script>
+

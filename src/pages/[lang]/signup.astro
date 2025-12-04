@@ -1,0 +1,223 @@
+---
+import PublicLayout from '../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../i18n/index';
+import { getApiUrl } from '../../shared/config';
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const lang = resolveLangFromParams(Astro.params.lang);
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+const apiUrl = getApiUrl();
+---
+
+<PublicLayout title={t.common.signUp} lang={lang} t={t} currentPath={currentPath}>
+  <div class="max-w-md mx-auto">
+    <div class="bg-[var(--inkq-surface)] rounded-lg p-8 border border-[var(--inkq-border)]">
+      <h2 class="text-2xl font-bold mb-6 text-[var(--inkq-fg)]">{t.common.signUp}</h2>
+      {Astro.url.searchParams.get('error') && (
+        <div class="mb-4 p-3 rounded-md bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+          {Astro.url.searchParams.get('error')}
+        </div>
+      )}
+      {!Astro.url.searchParams.get('error') && (
+        <div
+          id="signup-error"
+          class="hidden mb-4 p-3 rounded-md bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm"
+        ></div>
+      )}
+      <form id="signup-form" method="POST" action="/api/v1/auth/signup" class="space-y-4">
+        <div>
+          <label for="email" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
+            {t.auth.emailLabel}
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            class="w-full px-4 py-2 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-muted)]"
+            required
+            autocomplete="email"
+          />
+        </div>
+        <div>
+          <label for="username" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
+            Username
+          </label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            class="w-full px-4 py-2 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-muted)]"
+            required
+            minlength="3"
+            maxlength="50"
+            autocomplete="username"
+          />
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
+            {t.auth.passwordLabel}
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            class="w-full px-4 py-2 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-muted)]"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          />
+        </div>
+        <div>
+          <label for="accountType" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
+            {t.auth.accountTypeLabel}
+          </label>
+          <select
+            id="accountType"
+            name="accountType"
+            class="w-full px-4 py-2 rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg)] text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-muted)]"
+            required
+          >
+            <option value="artist">{t.auth.accountTypeArtist}</option>
+            <option value="studio">{t.auth.accountTypeStudio}</option>
+            <option value="model">{t.auth.accountTypeModel}</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          class="w-full px-4 py-2 rounded-md font-medium bg-[var(--inkq-fg)] text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+        >
+          {t.common.signUp}
+        </button>
+      </form>
+      <p class="mt-4 text-sm text-[var(--inkq-muted)] text-center">
+        Already have an account?{' '}
+        <a href={`/${lang}/signin`} class="text-[var(--inkq-fg)] hover:underline">
+          {t.common.signIn}
+        </a>
+      </p>
+    </div>
+  </div>
+</PublicLayout>
+
+<script define:vars={{ apiUrl, lang }}>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('signup-form');
+    const errorEl = document.getElementById('signup-error');
+
+    if (!form) {
+      return;
+    }
+
+    function showError(message) {
+      if (!errorEl) return;
+      errorEl.textContent = message || 'Signup failed. Please try again.';
+      errorEl.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+      }
+
+      const formData = new FormData(form);
+      const email = formData.get('email');
+      const username = formData.get('username');
+      const password = formData.get('password');
+      const accountType = formData.get('accountType');
+
+      if (
+        typeof email !== 'string' ||
+        typeof username !== 'string' ||
+        typeof password !== 'string' ||
+        typeof accountType !== 'string'
+      ) {
+        showError('Please fill in all fields.');
+        return;
+      }
+
+      const signupPayload = {
+        email,
+        username,
+        password,
+        account_type: accountType,
+      };
+
+      try {
+        // First, create the user
+        const signupResponse = await fetch(`${apiUrl}/api/v1/auth/signup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(signupPayload),
+        });
+
+        const signupData = await signupResponse.json().catch(() => null);
+
+        if (!signupResponse.ok) {
+          if (signupData && signupData.detail) {
+            showError(typeof signupData.detail === 'string' ? signupData.detail : 'Signup failed.');
+          } else {
+            showError('Signup failed. Please try again.');
+          }
+          return;
+        }
+
+        if (!signupData || !signupData.email || !signupData.username || !signupData.account_type) {
+          showError('Unexpected response from server.');
+          return;
+        }
+
+        const createdUser = signupData;
+
+        // Then, sign in to obtain a session token
+        const signinResponse = await fetch(`${apiUrl}/api/v1/auth/signin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            login: email,
+            password,
+          }),
+        });
+
+        const signinData = await signinResponse.json().catch(() => null);
+
+        if (!signinResponse.ok || !signinData || !signinData.access_token || !signinData.user) {
+          showError('Signup succeeded but automatic signin failed. Please try signing in.');
+          return;
+        }
+
+        const token = signinData.access_token;
+        const user = signinData.user;
+
+        // Set session cookie for middleware and other frontend logic
+        document.cookie = `inkq_session=${encodeURIComponent(token)}; path=/`;
+
+        let redirectPath;
+        if (!user.onboarding_completed) {
+          redirectPath = `/${lang}/onboarding/${user.account_type}`;
+        } else {
+          redirectPath = `/${lang}/dashboard/${user.account_type}`;
+        }
+
+        window.location.href = redirectPath;
+      } catch (err) {
+        showError('Signup failed. Please check your connection and try again.');
+      }
+    });
+  });
+</script>
+

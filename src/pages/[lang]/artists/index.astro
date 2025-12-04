@@ -1,0 +1,400 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
+import type { Lang, I18nSchema } from '../../../i18n/types';
+import { callBackendJsonParse } from '../../../shared/api/client';
+
+export const prerender = false;
+
+export async function getStaticPaths() {
+  return supportedLangs.map((lang) => ({
+    params: { lang },
+  }));
+}
+
+type PublicArtistCard = {
+  id: number;
+  username: string;
+  slug: string;
+  display_name?: string | null;
+  city?: string | null;
+  styles: string[];
+  price_from?: number | null;
+  price_currency: string;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+};
+
+type PublicArtistListResponse = {
+  items: PublicArtistCard[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+type PublicArtistStyle = {
+  id: string;
+  label_en: string;
+  label_ru: string;
+};
+
+type PublicArtistFiltersResponse = {
+  cities: string[];
+  styles: PublicArtistStyle[];
+};
+
+const lang: Lang = resolveLangFromParams(Astro.params.lang);
+const t: I18nSchema = getTranslations(lang);
+const currentPath = Astro.url.pathname;
+
+const searchParams = Astro.url.searchParams;
+const cityParam = searchParams.get('city') || '';
+const stylesParam = searchParams.get('styles') || '';
+const limitParam = searchParams.get('limit');
+const offsetParam = searchParams.get('offset');
+
+const parsedLimit = limitParam ? Number(limitParam) : 16;
+const parsedOffset = offsetParam ? Number(offsetParam) : 0;
+const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 48) : 16;
+const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+
+const selectedStyles = stylesParam
+  ? stylesParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : [];
+
+let filters: PublicArtistFiltersResponse | null = null;
+let catalog: PublicArtistListResponse | null = null;
+let loadError: string | null = null;
+
+try {
+  [filters, catalog] = await Promise.all([
+    callBackendJsonParse<PublicArtistFiltersResponse>('/api/v1/public/artists/filters'),
+    callBackendJsonParse<PublicArtistListResponse>(
+      `/api/v1/public/artists?city=${encodeURIComponent(cityParam)}&styles=${encodeURIComponent(
+        stylesParam
+      )}&limit=${limit}&offset=${offset}`
+    ),
+  ]);
+} catch (error: any) {
+  loadError = error?.message || 'Failed to load artists';
+}
+
+const hasResults = !!catalog && catalog.items.length > 0;
+const canLoadMore = !!catalog && catalog.items.length + catalog.offset < catalog.total;
+
+const buildQuery = (nextOffset: number) => {
+  const params = new URLSearchParams();
+  if (cityParam) params.set('city', cityParam);
+  if (stylesParam) params.set('styles', stylesParam);
+  if (limit !== 16) params.set('limit', String(limit));
+  if (nextOffset > 0) params.set('offset', String(nextOffset));
+  const query = params.toString();
+  return query ? `?${query}` : '';
+};
+---
+
+<PublicLayout title={t.catalog.title} lang={lang} t={t} currentPath={currentPath}>
+  <div class="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h1 class="text-3xl font-bold mb-2 text-[var(--inkq-fg)]">{t.catalog.title}</h1>
+      <p class="text-[var(--inkq-muted)]">{t.catalog.subtitle}</p>
+      {catalog && (
+        <p class="mt-2 text-xs text-[var(--inkq-muted)]">
+          {catalog.total} {t.catalog.resultsLabel}
+        </p>
+      )}
+    </div>
+    <form method="GET" action={Astro.url.pathname} class="flex flex-col gap-3 md:flex-row md:items-end">
+      <div class="flex flex-col gap-1">
+        <label for="city" class="text-sm font-medium text-[var(--inkq-fg)]">
+          {t.catalog.filterCity}
+        </label>
+        <select
+          id="city"
+          name="city"
+          class="min-w-[180px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        >
+          <option value="">{t.catalog.allCities}</option>
+          {filters?.cities.map((city) => (
+            <option value={city} selected={city === cityParam}>
+              {city}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-1 relative" id="style-dropdown-container">
+        <label for="style-dropdown-trigger" class="text-sm font-medium text-[var(--inkq-fg)]">
+          {t.catalog.filterStyle}
+        </label>
+        <button
+          type="button"
+          id="style-dropdown-trigger"
+          class="min-w-[180px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)] flex items-center justify-between"
+          aria-haspopup="true"
+          aria-expanded="false"
+        >
+          <span id="style-dropdown-label">
+            {selectedStyles.length === 0
+              ? t.catalog.anyStyle
+              : lang === 'ru'
+                ? t.catalog.stylesSelected.replace('{count}', String(selectedStyles.length))
+                : t.catalog.stylesSelected
+                    .replace('{count}', String(selectedStyles.length))
+                    .replace('{plural}', selectedStyles.length === 1 ? '' : 's')}
+          </span>
+          <span class="ml-2">▼</span>
+        </button>
+        <div
+          id="style-dropdown-menu"
+          class="hidden absolute top-full left-0 mt-1 min-w-[240px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-surface)] shadow-lg z-10 max-h-64 overflow-y-auto"
+        >
+          {filters?.styles.map((style) => {
+            const isChecked = selectedStyles.includes(style.id);
+            const label = lang === 'ru' ? style.label_ru : style.label_en;
+            return (
+              <label class="flex items-center gap-2 px-3 py-2 hover:bg-[var(--inkq-bg-subtle)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="styles"
+                  value={style.id}
+                  checked={isChecked}
+                  class="h-4 w-4 rounded border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)]"
+                />
+                <span class="text-sm text-[var(--inkq-fg)]">{label}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <input type="hidden" name="limit" value={limit} />
+
+      <div class="flex gap-2">
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+        >
+          {lang === 'ru' ? 'Применить' : 'Apply'}
+        </button>
+        <a
+          href={Astro.url.pathname}
+          class="inline-flex items-center justify-center rounded-md border border-[var(--inkq-border)] px-4 py-2 text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+        >
+          {t.catalog.clearFilters}
+        </a>
+      </div>
+    </form>
+  </div>
+
+  {loadError && (
+    <div class="rounded-md border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-500 flex items-center justify-between mb-6">
+      <span>
+        {t.catalog.errorLoading} {loadError !== 'Failed to load artists' && `(${loadError})`}
+      </span>
+      <a
+        href={Astro.url.href}
+        class="ml-4 inline-flex items-center justify-center rounded-md border border-red-500/60 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10 transition-colors"
+      >
+        {t.catalog.retry}
+      </a>
+    </div>
+  )}
+
+  {catalog && hasResults && (
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {catalog.items.map((artist) => {
+        const cardTitle = artist.display_name || artist.username;
+        const visibleStyles = artist.styles.slice(0, 4);
+        const remainingCount = artist.styles.length - visibleStyles.length;
+        const hasPrice = typeof artist.price_from === 'number' && artist.price_from > 0;
+
+        return (
+          <a
+            href={`/${lang}/artists/${artist.slug}`}
+            class="group block overflow-hidden rounded-xl border border-[var(--inkq-border)] bg-[var(--inkq-surface)] hover:border-[var(--inkq-muted)] transition-colors shadow-sm"
+          >
+            <div class="relative h-28 w-full bg-[var(--inkq-bg-subtle)]">
+              <img
+                src={artist.banner_url || '/placeholder-banner.svg'}
+                alt={cardTitle}
+                class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                loading="lazy"
+              />
+              <div class="absolute -bottom-[50px] left-4 flex items-end gap-3">
+                <!-- Avatar: 100x100px for listing cards -->
+                <div class="h-[100px] w-[100px] rounded-full border-4 border-[var(--inkq-surface)] bg-[var(--inkq-bg-subtle)] overflow-hidden flex items-center justify-center text-xl font-semibold text-[var(--inkq-muted)]">
+                  {artist.avatar_url ? (
+                    <img
+                      src={artist.avatar_url}
+                      alt={artist.username}
+                      class="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span>{cardTitle.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div class="pb-2">
+                  <h2 class="text-lg font-semibold text-[var(--inkq-fg)] line-clamp-1">
+                    {cardTitle}
+                  </h2>
+                  <p class="text-sm text-[var(--inkq-muted)] line-clamp-1">
+                    @{artist.username}
+                    {artist.city ? ` • ${artist.city}` : ''}
+                  </p>
+                  {hasPrice && (
+                    <p class="mt-1 text-xs font-medium text-[var(--inkq-fg)]">
+                      {lang === 'ru'
+                        ? `от ${artist.price_from} €`
+                        : `From ${artist.price_from} €`}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-14 pb-4 px-4 flex flex-col gap-3">
+              <div class="flex flex-wrap gap-2">
+                {visibleStyles.map((styleId) => (
+                  <span class="px-2 py-1 text-[10px] rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-fg)] uppercase tracking-wide">
+                    {styleId}
+                  </span>
+                ))}
+                {remainingCount > 0 && (
+                  <span class="px-2 py-1 text-[10px] rounded-full bg-[var(--inkq-bg-subtle)] text-[var(--inkq-muted)]">
+                    +{remainingCount}
+                  </span>
+                )}
+                {visibleStyles.length === 0 && (
+                  <span class="text-[11px] text-[var(--inkq-muted)]">
+                    {lang === 'ru' ? 'Стили не указаны' : 'Styles not specified'}
+                  </span>
+                )}
+              </div>
+
+              {!hasPrice && (
+                <p class="text-xs text-[var(--inkq-muted)]">
+                  {lang === 'ru' ? 'Цена по запросу' : 'Price on request'}
+                </p>
+              )}
+            </div>
+          </a>
+        );
+      })}
+    </div>
+  )}
+
+  {catalog && !hasResults && !loadError && (
+    <div class="mt-10 rounded-lg border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-6 py-8 text-center space-y-3">
+      <h2 class="text-lg font-semibold text-[var(--inkq-fg)]">{t.catalog.noResults}</h2>
+      <p class="text-sm text-[var(--inkq-muted)]">{t.catalog.emptyWithFilters}</p>
+      <div class="flex justify-center gap-3 pt-2">
+        <a
+          href={Astro.url.pathname}
+          class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+        >
+          {t.catalog.clearFilters}
+        </a>
+      </div>
+    </div>
+  )}
+
+  {catalog && hasResults && canLoadMore && (
+    <div class="mt-8 flex justify-center">
+      <a
+        href={buildQuery(catalog.offset + catalog.limit)}
+        class="inline-flex items-center justify-center rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-surface)] px-6 py-2 text-sm font-medium text-[var(--inkq-fg)] hover:bg-[var(--inkq-bg-subtle)] transition-colors"
+      >
+        {t.catalog.loadMore}
+      </a>
+    </div>
+  )}
+</PublicLayout>
+
+<script>
+  // Style dropdown toggle functionality
+  const container = document.getElementById('style-dropdown-container');
+  const trigger = document.getElementById('style-dropdown-trigger');
+  const menu = document.getElementById('style-dropdown-menu');
+  const label = document.getElementById('style-dropdown-label');
+  const checkboxes = menu?.querySelectorAll('input[type="checkbox"]') || [];
+
+  if (trigger && menu && label) {
+    const lang = document.documentElement.lang || 'en';
+    const anyStyleText = lang === 'ru' ? 'Любой стиль' : 'Any style';
+    const stylesSelectedText = lang === 'ru' 
+      ? (count: number) => `Выбрано стилей: ${count}`
+      : (count: number) => `${count} style${count === 1 ? '' : 's'} selected`;
+
+    // Toggle dropdown
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = !menu.classList.contains('hidden');
+      menu.classList.toggle('hidden');
+      trigger.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (container && !container.contains(e.target as Node)) {
+        menu.classList.add('hidden');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Update label when checkboxes change
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        const selected = Array.from(checkboxes)
+          .filter((cb) => (cb as HTMLInputElement).checked)
+          .map((cb) => (cb as HTMLInputElement).value);
+        
+        if (selected.length === 0) {
+          label.textContent = anyStyleText;
+        } else {
+          label.textContent = stylesSelectedText(selected.length);
+        }
+      });
+    });
+
+    // Prevent form submission when clicking checkboxes (let user click Apply)
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
+  }
+
+  // Update form to collect selected styles on submit
+  const form = document.querySelector('form');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      const selectedStyles = Array.from(checkboxes)
+        .filter((cb) => (cb as HTMLInputElement).checked)
+        .map((cb) => (cb as HTMLInputElement).value);
+      
+      // Remove existing hidden style inputs
+      const existingHiddenInputs = form.querySelectorAll('input[name="styles"][type="hidden"]');
+      existingHiddenInputs.forEach((input) => input.remove());
+
+      // Add hidden input for selected styles (comma-separated)
+      if (selectedStyles.length > 0) {
+        const stylesInput = document.createElement('input');
+        stylesInput.type = 'hidden';
+        stylesInput.name = 'styles';
+        stylesInput.value = selectedStyles.join(',');
+        form.appendChild(stylesInput);
+      }
+      
+      // Remove checkbox inputs from form submission (they're just for UI)
+      checkboxes.forEach((cb) => {
+        (cb as HTMLInputElement).name = '';
+      });
+    });
+  }
+</script>
+

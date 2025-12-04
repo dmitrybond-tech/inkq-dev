@@ -1,0 +1,127 @@
+---
+// Client-side script to handle theme switching
+---
+
+<button
+  id="theme-toggle"
+  class="flex items-center justify-center w-9 h-9 rounded-md bg-[var(--inkq-surface)] hover:bg-[var(--inkq-bg-subtle)] border border-[var(--inkq-border)] transition-colors"
+  aria-label="Toggle theme"
+  title="Toggle theme"
+>
+  <!-- Sun icon (for light theme) -->
+  <svg
+    id="theme-icon-sun"
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    class="text-[var(--inkq-fg)]"
+    style="display: none;"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+  <!-- Moon icon (for dark theme) -->
+  <svg
+    id="theme-icon-moon"
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    class="text-[var(--inkq-fg)]"
+    style="display: none;"
+    aria-hidden="true"
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+</button>
+
+<script>
+  const themeToggle = document.getElementById('theme-toggle');
+  const sunIcon = document.getElementById('theme-icon-sun');
+  const moonIcon = document.getElementById('theme-icon-moon');
+
+  function getTheme(): 'light' | 'dark' {
+    const stored = localStorage.getItem('inkq-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return 'dark'; // default
+  }
+
+  function setTheme(theme: 'light' | 'dark') {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('inkq-theme', theme);
+    updateIcon(theme);
+    // Update aria-label dynamically
+    if (themeToggle) {
+      themeToggle.setAttribute(
+        'aria-label',
+        theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      );
+      themeToggle.setAttribute(
+        'title',
+        theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      );
+    }
+  }
+
+  function updateIcon(theme: 'light' | 'dark') {
+    if (sunIcon && moonIcon) {
+      if (theme === 'light') {
+        sunIcon.style.display = '';
+        moonIcon.style.display = 'none';
+      } else {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = '';
+      }
+    }
+  }
+
+  // Initialize theme on load - check if already set
+  const currentTheme = document.documentElement.getAttribute('data-theme') as 'light' | 'dark' | null;
+  if (currentTheme === null) {
+    const initialTheme = getTheme();
+    setTheme(initialTheme);
+  } else {
+    // Theme is already set, just update the icon and label
+    updateIcon(currentTheme);
+    // Update aria-label
+    if (themeToggle) {
+      themeToggle.setAttribute(
+        'aria-label',
+        currentTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      );
+      themeToggle.setAttribute(
+        'title',
+        currentTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      );
+    }
+  }
+
+  // Toggle on click
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = getTheme();
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      setTheme(newTheme);
+    });
+  }
+</script>
+

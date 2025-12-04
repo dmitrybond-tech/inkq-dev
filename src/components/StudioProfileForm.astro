@@ -1,0 +1,291 @@
+---
+import type { Lang, I18nSchema } from '../i18n/types';
+import { getApiUrl } from '../shared/config';
+
+interface StudioMeResponse {
+  username: string;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  onboarding_completed: boolean;
+  name?: string | null;
+  about?: string | null;
+  city?: string | null;
+  address?: string | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  vk?: string | null;
+  session_price_label?: string | null;
+}
+
+interface Props {
+  lang: Lang;
+  t: I18nSchema;
+  studio?: StudioMeResponse | null;
+  sessionToken?: string | null;
+}
+
+const { lang, t, studio: initialStudio = null, sessionToken = null } = Astro.props;
+const apiUrl = getApiUrl();
+const formId = `studio-profile-form-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<form id={formId} class="space-y-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-2">
+      <label for={`${formId}-name`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'Название студии' : 'Studio name'}
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        id={`${formId}-name`}
+        name="name"
+        type="text"
+        required
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        value={initialStudio?.name || ''}
+      />
+    </div>
+    <div class="space-y-2">
+      <label for={`${formId}-city`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.cityLabel}
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        id={`${formId}-city`}
+        name="city"
+        type="text"
+        required
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        value={initialStudio?.city || ''}
+      />
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <label for={`${formId}-address`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {lang === 'ru' ? 'Адрес' : 'Address'}
+      <span class="text-red-500">*</span>
+    </label>
+    <input
+      id={`${formId}-address`}
+      name="address"
+      type="text"
+      required
+      class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      value={initialStudio?.address || ''}
+    />
+  </div>
+
+  <div class="space-y-2">
+    <label for={`${formId}-about`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {t.profile.aboutLabel}
+    </label>
+    <textarea
+      id={`${formId}-about`}
+      name="about"
+      class="w-full min-h-[120px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      maxlength={2000}
+    >
+      {initialStudio?.about || ''}
+    </textarea>
+    <p class="text-xs text-[var(--inkq-muted)]">
+      {lang === 'ru'
+        ? 'Расскажите о вашей студии, пространстве и атмосфере. До 2000 символов.'
+        : 'Tell clients about your studio, space, and atmosphere. Up to 2000 characters.'}
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="space-y-2">
+      <label for={`${formId}-instagram`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.instagramLabel}
+      </label>
+      <input
+        id={`${formId}-instagram`}
+        name="instagram"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        placeholder={lang === 'ru' ? '@nickname или ссылка' : '@handle or link'}
+        value={initialStudio?.instagram || ''}
+      />
+    </div>
+    <div class="space-y-2">
+      <label for={`${formId}-telegram`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.telegramLabel}
+      </label>
+      <input
+        id={`${formId}-telegram`}
+        name="telegram"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        placeholder={lang === 'ru' ? '@nickname или ссылка' : '@handle or link'}
+        value={initialStudio?.telegram || ''}
+      />
+    </div>
+    <div class="space-y-2">
+      <label for={`${formId}-vk`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {lang === 'ru' ? 'VK (необязательно)' : 'VK (optional)'}
+      </label>
+      <input
+        id={`${formId}-vk`}
+        name="vk"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        placeholder={lang === 'ru' ? 'Ссылка на страницу' : 'Profile link'}
+        value={initialStudio?.vk || ''}
+      />
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <label for={`${formId}-session-price-label`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {lang === 'ru' ? 'Стоимость сеанса (лейбл)' : 'Session price label'}
+    </label>
+    <input
+      id={`${formId}-session-price-label`}
+      name="session_price_label"
+      type="text"
+      class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      placeholder={lang === 'ru' ? 'например, «от 80€/сеанс»' : 'e.g. "from 80€/session"'}
+      value={initialStudio?.session_price_label || ''}
+    />
+  </div>
+
+  <div id={`${formId}-message`} class="text-sm text-[var(--inkq-muted)]"></div>
+
+  <button
+    type="submit"
+    class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+  >
+    {lang === 'ru' ? 'Сохранить профиль студии' : 'Save studio profile'}
+  </button>
+</form>
+
+<script define:vars={{ apiUrl, formId, t, lang, sessionToken }}>
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = sessionToken || getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    const messageEl = document.getElementById(`${formId}-message`);
+
+    if (!form || !messageEl) return;
+
+    const formData = new FormData(form);
+    const name = (formData.get('name') || '').toString().trim();
+    const city = (formData.get('city') || '').toString().trim();
+    const address = (formData.get('address') || '').toString().trim();
+
+    if (!name || !city || !address) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Пожалуйста, заполните название, город и адрес студии.'
+          : 'Please fill in studio name, city and address.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    const payload = {
+      name,
+      city,
+      address,
+      about: (formData.get('about') || '').toString().trim() || null,
+      instagram: (formData.get('instagram') || '').toString().trim() || null,
+      telegram: (formData.get('telegram') || '').toString().trim() || null,
+      vk: (formData.get('vk') || '').toString().trim() || null,
+      session_price_label: (formData.get('session_price_label') || '').toString().trim() || null,
+    };
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    if (!token) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Нет активной сессии. Пожалуйста, войдите снова.'
+          : 'No active session. Please sign in again.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    try {
+      messageEl.textContent = lang === 'ru' ? 'Сохранение…' : 'Saving…';
+      messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const response = await fetch(`${apiUrl}/api/v1/studios/me`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Error' }));
+
+        const isAuthError =
+          response.status === 401 ||
+          (errorData && (errorData.detail === 'Missing authorization token' || errorData.detail === 'Session expired'));
+
+        if (isAuthError) {
+          messageEl.textContent =
+            lang === 'ru'
+              ? 'Сессия истекла. Пожалуйста, войдите снова.'
+              : 'Session expired. Please sign in again.';
+          messageEl.className = 'text-sm text-red-500';
+          return;
+        } else {
+          messageEl.textContent =
+            (errorData && errorData.detail) ||
+            (lang === 'ru' ? 'Не удалось сохранить профиль студии' : 'Failed to save studio profile');
+        }
+
+        messageEl.className = 'text-sm text-red-500';
+        return;
+      }
+
+      messageEl.textContent = lang === 'ru' ? 'Профиль студии сохранён' : 'Studio profile saved';
+      messageEl.className = 'text-sm text-green-500';
+    } catch (error) {
+      console.error('Failed to update studio profile', error);
+      messageEl.textContent =
+        lang === 'ru' ? 'Ошибка при сохранении профиля студии' : 'Error while saving studio profile';
+      messageEl.className = 'text-sm text-red-500';
+    }
+  }
+
+  const form = document.getElementById(formId);
+  if (form && typeof form.addEventListener === 'function') {
+    form.addEventListener('submit', handleSubmit);
+  }
+</script>
+
+

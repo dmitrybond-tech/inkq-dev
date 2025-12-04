@@ -1,0 +1,304 @@
+---
+import type { Lang, I18nSchema } from '../i18n/types';
+import { getApiUrl } from '../shared/config';
+
+interface ModelMeResponse {
+  username: string;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  onboarding_completed: boolean;
+  display_name?: string | null;
+  about?: string | null;
+  city?: string | null;
+  instagram?: string | null;
+  telegram?: string | null;
+}
+
+interface Props {
+  lang: Lang;
+  t: I18nSchema;
+  model?: ModelMeResponse | null;
+  sessionToken?: string | null;
+}
+
+const { lang, t, model: initialModel = null, sessionToken = null } = Astro.props;
+const apiUrl = getApiUrl();
+const formId = `model-profile-form-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<form id={formId} class="space-y-6">
+  <div class="space-y-2">
+    <label for={`${formId}-display-name`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {lang === 'ru' ? 'Имя на странице (опционально)' : 'Display name (optional)'}
+    </label>
+    <input
+      id={`${formId}-display-name`}
+      name="display_name"
+      type="text"
+      class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      value={initialModel?.display_name || ''}
+      placeholder={lang === 'ru' ? 'Например, Ink Fox' : 'e.g. Ink Fox'}
+    />
+  </div>
+
+  <div class="space-y-2">
+    <label for={`${formId}-about`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {t.profile.aboutLabel}
+      <span class="text-red-500">*</span>
+    </label>
+    <textarea
+      id={`${formId}-about`}
+      name="about"
+      class="w-full min-h-[140px] rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      maxlength={2000}
+      required
+    >
+      {initialModel?.about || ''}
+    </textarea>
+    <p class="text-xs text-[var(--inkq-muted)]">
+      {lang === 'ru'
+        ? 'Расскажите о себе, опыте и форматах съёмок. Рекомендуем не менее 40 символов.'
+        : 'Tell artists and studios about yourself, your experience and shoot formats. Aim for at least 40 characters.'}
+    </p>
+  </div>
+
+  <div class="space-y-2">
+    <label for={`${formId}-city`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+      {t.profile.cityLabel}
+      <span class="text-red-500">*</span>
+    </label>
+    <input
+      id={`${formId}-city`}
+      name="city"
+      type="text"
+      class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+      required
+      value={initialModel?.city || ''}
+    />
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-2">
+      <label for={`${formId}-instagram`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.instagramLabel}
+      </label>
+      <input
+        id={`${formId}-instagram`}
+        name="instagram"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        placeholder={lang === 'ru' ? '@nickname или ссылка' : '@handle or link'}
+        value={initialModel?.instagram || ''}
+      />
+    </div>
+
+    <div class="space-y-2">
+      <label for={`${formId}-telegram`} class="block text-sm font-medium text-[var(--inkq-fg)]">
+        {t.profile.telegramLabel}
+      </label>
+      <input
+        id={`${formId}-telegram`}
+        name="telegram"
+        type="text"
+        class="w-full rounded-md border border-[var(--inkq-border)] bg-[var(--inkq-bg-subtle)] px-3 py-2 text-sm text-[var(--inkq-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--inkq-fg)]"
+        placeholder={lang === 'ru' ? '@nickname или ссылка' : '@handle or link'}
+        value={initialModel?.telegram || ''}
+      />
+    </div>
+  </div>
+
+  <div id={`${formId}-message`} class="text-sm text-[var(--inkq-muted)]"></div>
+
+  <button
+    type="submit"
+    class="inline-flex items-center justify-center rounded-md bg-[var(--inkq-fg)] px-4 py-2 text-sm font-medium text-[var(--inkq-bg)] hover:opacity-90 transition-opacity"
+  >
+    {lang === 'ru' ? 'Сохранить профиль модели' : 'Save model profile'}
+  </button>
+</form>
+
+<script define:vars={{ apiUrl, formId, lang, t, sessionToken }}>
+  function getSessionTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('inkq_session='));
+
+    if (!cookie) return null;
+
+    const [, value] = cookie.split('=');
+    if (!value) return null;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildAuthHeaders(extra) {
+    const token = sessionToken || getSessionTokenFromCookie();
+    const base = { ...(extra || {}) };
+
+    if (token) {
+      base.Authorization = `Bearer ${token}`;
+    }
+
+    return { headers: base, token };
+  }
+
+  function getSessionErrorMessage() {
+    const lang = document.documentElement.lang || 'en';
+    return lang === 'ru'
+      ? 'Сессия истекла. Пожалуйста, войдите снова.'
+      : 'Session expired. Please sign in again.';
+  }
+
+  async function preloadModelData() {
+    const messageEl = document.getElementById(`${formId}-message`);
+    const { headers, token } = buildAuthHeaders();
+    if (!token) {
+      return;
+    }
+    try {
+      const resp = await fetch(`${apiUrl}/api/v1/models/me`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      const aboutEl = document.getElementById(`${formId}-about`);
+      const cityEl = document.getElementById(`${formId}-city`);
+      const displayNameEl = document.getElementById(`${formId}-display-name`);
+      const instagramEl = document.getElementById(`${formId}-instagram`);
+      const telegramEl = document.getElementById(`${formId}-telegram`);
+
+      if (aboutEl && 'value' in aboutEl && data.about != null) {
+        aboutEl.value = data.about;
+      }
+      if (cityEl && 'value' in cityEl && data.city != null) {
+        cityEl.value = data.city;
+      }
+      if (displayNameEl && 'value' in displayNameEl && data.display_name != null) {
+        displayNameEl.value = data.display_name;
+      }
+      if (instagramEl && 'value' in instagramEl && data.instagram != null) {
+        instagramEl.value = data.instagram;
+      }
+      if (telegramEl && 'value' in telegramEl && data.telegram != null) {
+        telegramEl.value = data.telegram;
+      }
+
+      if (messageEl) {
+        messageEl.textContent =
+          lang === 'ru' ? 'Профиль загружен.' : 'Profile loaded.';
+        messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+      }
+    } catch (err) {
+      console.error('Failed to preload model profile', err);
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    const messageEl = document.getElementById(`${formId}-message`);
+
+    if (!form || !messageEl) return;
+
+    const formData = new FormData(form);
+    const about = (formData.get('about') || '').toString().trim();
+    const city = (formData.get('city') || '').toString().trim();
+
+    if (!about || about.length < 40 || !city) {
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Пожалуйста, заполните «О себе» (минимум 40 символов) и город.'
+          : 'Please fill in About (at least 40 characters) and City.';
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    const payload = {
+      display_name: (formData.get('display_name') || '').toString().trim() || null,
+      about,
+      city,
+      instagram: (formData.get('instagram') || '').toString().trim() || null,
+      telegram: (formData.get('telegram') || '').toString().trim() || null,
+    };
+
+    const { headers, token } = buildAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    if (!token) {
+      messageEl.textContent = getSessionErrorMessage();
+      messageEl.className = 'text-sm text-red-500';
+      return;
+    }
+
+    try {
+      messageEl.textContent = lang === 'ru' ? 'Сохранение…' : 'Saving…';
+      messageEl.className = 'text-sm text-[var(--inkq-muted)]';
+
+      const response = await fetch(`${apiUrl}/api/v1/models/me`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Error' }));
+
+        const isAuthError =
+          response.status === 401 ||
+          (errorData &&
+            (errorData.detail === 'Missing authorization token' ||
+              errorData.detail === 'Session expired'));
+
+        if (isAuthError) {
+          messageEl.textContent = getSessionErrorMessage();
+          messageEl.className = 'text-sm text-red-500';
+          return;
+        } else {
+          messageEl.textContent =
+            (errorData && errorData.detail) ||
+            (lang === 'ru'
+              ? 'Не удалось сохранить профиль модели'
+              : 'Failed to save model profile');
+        }
+
+        messageEl.className = 'text-sm text-red-500';
+        return;
+      }
+
+      messageEl.textContent =
+        lang === 'ru' ? 'Профиль модели сохранён' : 'Model profile saved';
+      messageEl.className = 'text-sm text-green-500';
+    } catch (error) {
+      console.error('Failed to update model profile', error);
+      messageEl.textContent =
+        lang === 'ru'
+          ? 'Ошибка при сохранении профиля'
+          : 'Error while saving profile';
+      messageEl.className = 'text-sm text-red-500';
+    }
+  }
+
+  const form = document.getElementById(formId);
+  if (form && typeof form.addEventListener === 'function') {
+    form.addEventListener('submit', handleSubmit);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => {
+      preloadModelData();
+    });
+  }
+</script>
+
+
