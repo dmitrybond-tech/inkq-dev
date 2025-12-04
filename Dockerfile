@@ -35,8 +35,9 @@ COPY . .
 # Remove prerender = false from pages to allow static build (build-time only, doesn't change source)
 RUN find src/pages -name "*.astro" -type f -exec sed -i '/export const prerender = false/d' {} + 2>/dev/null || true
 
-# Skip placeholder routes during static build to avoid API calls
-# Use Node.js script to replace getStaticPaths that return placeholder with empty array
+# Fix dynamic routes for static build
+# 1. Replace getStaticPaths that return placeholder with empty array
+# 2. Add getStaticPaths to dynamic routes that are missing it
 RUN node -e "\
 const fs = require('fs'); \
 const path = require('path'); \
@@ -59,13 +60,26 @@ findAstroFiles('src/pages').forEach(file => { \
   try { \
     let content = fs.readFileSync(file, 'utf8'); \
     const original = content; \
-    if (content.includes('placeholder')) { \
+    const isDynamic = /\[.*\]/.test(path.basename(file)); \
+    const hasGetStaticPaths = /export (async )?function getStaticPaths/.test(content); \
+    \
+    if (content.includes('placeholder') && hasGetStaticPaths) { \
       content = content.replace( \
-        /export async function getStaticPaths\(\) \{[\s\S]*?return supportedLangs\.map\(\(lang\) => \(\{[\s\S]*?params: \{ lang, (?:slug|username): ['\"]placeholder['\"] \},[\s\S]*?\}\);[\s\S]*?\}/g, \
+        /export async function getStaticPaths\(\) \{[\s\S]*?return supportedLangs\.map\(\(lang\) => \(\{[\s\S]*?params: \{ lang, (?:slug|username|studioSlug): ['\"]placeholder['\"] \},[\s\S]*?\}\);[\s\S]*?\}/g, \
         'export async function getStaticPaths() {\\n  return [];\\n}' \
       ); \
-      if (content !== original) fs.writeFileSync(file, content, 'utf8'); \
     } \
+    \
+    if (isDynamic && !hasGetStaticPaths) { \
+      const frontmatterEnd = content.indexOf('---', content.indexOf('---') + 3); \
+      if (frontmatterEnd > 0) { \
+        const insertPos = frontmatterEnd + 3; \
+        const getStaticPathsCode = '\\n\\nexport async function getStaticPaths() {\\n  return [];\\n}\\n'; \
+        content = content.slice(0, insertPos) + getStaticPathsCode + content.slice(insertPos); \
+      } \
+    } \
+    \
+    if (content !== original) fs.writeFileSync(file, content, 'utf8'); \
   } catch (e) {} \
 }); \
 " || true
