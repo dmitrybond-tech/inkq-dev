@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Environment files
+.env
+.env.*
+!.env.preprod.example
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.venv
+venv/
+ENV/
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Astro
+.astro
+dist
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Media (will be mounted as volume)
+media/
+
+# Tests
+tests/
+*.test.py
+pytest.ini
+
+# Alembic (backend will copy this explicitly)
+# alembic/
+
+# Docker
+docker-compose*.yml
+Dockerfile
+.dockerignore
+

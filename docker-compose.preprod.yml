@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    container_name: inkq_preprod_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-inkq_preprod}
+      POSTGRES_USER: ${POSTGRES_USER:-inkq_preprod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - inkq_preprod_db_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inkq_preprod} -d ${POSTGRES_DB:-inkq_preprod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/dmitrybond-tech/inkq-backend:preprod
+    container_name: inkq_preprod_backend
+    environment:
+      INKQ_PG_URL: postgresql+psycopg2://${POSTGRES_USER:-inkq_preprod}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-inkq_preprod}
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: preprod
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["http://localhost:4173"]}
+      MEDIA_ROOT: /app/media
+      MEDIA_URL_PREFIX: /media
+    env_file:
+      - .env.preprod
+    volumes:
+      - ./media:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/dmitrybond-tech/inkq-frontend:preprod
+    container_name: inkq_preprod_frontend
+    ports:
+      - "4173:4173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  inkq_preprod_db_data:
+
