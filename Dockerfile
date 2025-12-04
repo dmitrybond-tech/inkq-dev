@@ -71,11 +71,16 @@ findAstroFiles('src/pages').forEach(file => { \
     } \
     \
     if (isDynamic && !hasGetStaticPaths) { \
-      const frontmatterEnd = content.indexOf('---', content.indexOf('---') + 3); \
-      if (frontmatterEnd > 0) { \
-        const insertPos = frontmatterEnd + 3; \
-        const getStaticPathsCode = '\\n\\nexport async function getStaticPaths() {\\n  return [];\\n}\\n'; \
-        content = content.slice(0, insertPos) + getStaticPathsCode + content.slice(insertPos); \
+      const firstDash = content.indexOf('---'); \
+      const secondDash = content.indexOf('---', firstDash + 3); \
+      if (firstDash >= 0) { \
+        let insertPos = firstDash + 3; \
+        const afterFirstDash = content.indexOf('\\n', insertPos); \
+        if (afterFirstDash > 0) insertPos = afterFirstDash + 1; \
+        if (secondDash > 0 && insertPos < secondDash) { \
+          const getStaticPathsCode = '\\nexport async function getStaticPaths() {\\n  return [];\\n}\\n'; \
+          content = content.slice(0, insertPos) + getStaticPathsCode + content.slice(insertPos); \
+        } \
       } \
     } \
     \
