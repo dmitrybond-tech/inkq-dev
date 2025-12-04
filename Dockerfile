@@ -8,12 +8,18 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-# Use npm ci if package-lock.json is present (faster, reproducible); fallback to npm install for environments without a lockfile
-RUN if [ -f package-lock.json ]; then \
+# Use npm ci if package-lock.json is present (faster, reproducible); fallback to npm install for environments without a lockfile or if npm ci fails
+RUN set +e; \
+    if [ -f package-lock.json ]; then \
       npm ci; \
+      if [ $? -ne 0 ]; then \
+        echo "npm ci failed, falling back to npm install"; \
+        npm install; \
+      fi; \
     else \
       npm install; \
-    fi
+    fi; \
+    set -e
 
 # Copy frontend source
 COPY . .
