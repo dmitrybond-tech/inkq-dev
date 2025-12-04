@@ -4,11 +4,16 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (package-lock.json is optional with * pattern)
+COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm ci
+# Use npm ci if package-lock.json is present (faster, reproducible); fallback to npm install for environments without a lockfile
+RUN if [ -f package-lock.json ]; then \
+      npm ci; \
+    else \
+      npm install; \
+    fi
 
 # Copy frontend source
 COPY . .

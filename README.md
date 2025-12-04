@@ -123,6 +123,7 @@ The frontend is configured to call the backend via `/api` path (relative URL), w
 **Frontend build fails**:
 - Check Node version compatibility (requires Node 22+)
 - Review build logs: `docker compose -f docker-compose.preprod.yml logs frontend`
+- Note: The frontend Dockerfile uses `npm ci` when `package-lock.json` is present and falls back to `npm install` otherwise
 
 **Database connection errors**:
 - Ensure database container is healthy before starting backend
