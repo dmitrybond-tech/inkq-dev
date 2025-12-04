@@ -21,10 +21,7 @@ RUN set +e; \
     fi; \
     set -e
 
-# Copy frontend source
-COPY . .
-
-# Build arguments
+# Build arguments (set before copying source for better caching)
 ARG PUBLIC_API_BASE_URL=
 ARG ASTRO_OUTPUT_MODE=static
 
@@ -32,7 +29,10 @@ ARG ASTRO_OUTPUT_MODE=static
 ENV PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
 ENV ASTRO_OUTPUT_MODE=${ASTRO_OUTPUT_MODE}
 
-# Build the Astro app
+# Copy frontend source
+COPY . .
+
+# Build the Astro app (verbose output for debugging)
 RUN npm run build
 
 # Runtime stage
