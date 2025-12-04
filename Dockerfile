@@ -35,6 +35,41 @@ COPY . .
 # Remove prerender = false from pages to allow static build (build-time only, doesn't change source)
 RUN find src/pages -name "*.astro" -type f -exec sed -i '/export const prerender = false/d' {} + 2>/dev/null || true
 
+# Skip placeholder routes during static build to avoid API calls
+# Use Node.js script to replace getStaticPaths that return placeholder with empty array
+RUN node -e "\
+const fs = require('fs'); \
+const path = require('path'); \
+function findAstroFiles(dir) { \
+  const files = []; \
+  try { \
+    const entries = fs.readdirSync(dir, { withFileTypes: true }); \
+    for (const entry of entries) { \
+      const fullPath = path.join(dir, entry.name); \
+      if (entry.isDirectory()) { \
+        files.push(...findAstroFiles(fullPath)); \
+      } else if (entry.name.endsWith('.astro')) { \
+        files.push(fullPath); \
+      } \
+    } \
+  } catch (e) {} \
+  return files; \
+} \
+findAstroFiles('src/pages').forEach(file => { \
+  try { \
+    let content = fs.readFileSync(file, 'utf8'); \
+    const original = content; \
+    if (content.includes('placeholder')) { \
+      content = content.replace( \
+        /export async function getStaticPaths\(\) \{[\s\S]*?return supportedLangs\.map\(\(lang\) => \(\{[\s\S]*?params: \{ lang, (?:slug|username): ['\"]placeholder['\"] \},[\s\S]*?\}\);[\s\S]*?\}/g, \
+        'export async function getStaticPaths() {\\n  return [];\\n}' \
+      ); \
+      if (content !== original) fs.writeFileSync(file, content, 'utf8'); \
+    } \
+  } catch (e) {} \
+}); \
+" || true
+
 # Build the Astro app (verbose output for debugging)
 RUN npm run build
 
