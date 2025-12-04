@@ -34,8 +34,9 @@ yarn-error.log
 # Astro
 .astro
 dist
-# Exclude API routes for static Docker builds (API handled by backend)
+# Exclude API routes and middleware for static Docker builds (API/auth handled by backend)
 src/pages/api
+src/middleware.ts
 
 # IDE
 .vscode

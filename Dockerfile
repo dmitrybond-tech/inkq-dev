@@ -32,6 +32,9 @@ ENV ASTRO_OUTPUT_MODE=${ASTRO_OUTPUT_MODE}
 # Copy frontend source
 COPY . .
 
+# Remove prerender = false from pages to allow static build (build-time only, doesn't change source)
+RUN find src/pages -name "*.astro" -type f -exec sed -i '/export const prerender = false/d' {} + 2>/dev/null || true
+
 # Build the Astro app (verbose output for debugging)
 RUN npm run build
 
