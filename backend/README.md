@@ -9,6 +9,8 @@ FastAPI backend for the InkQ application.
 pip install -r requirements.txt
 ```
 
+Note: The backend depends on `python-multipart` for handling form-data and file uploads. This dependency is included in `requirements.txt` and will be installed automatically.
+
 2. Create a `.env` file in the repository root with:
 ```env
 INKQ_PG_URL=postgres://inkq:InkqDev2025!@localhost:5432/inkq
