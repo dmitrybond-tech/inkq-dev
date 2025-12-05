@@ -1,4 +1,5 @@
 ---
-// Redirect root to /en/
-return Astro.redirect('/en/');
+// Redirect root to /en/ with immediate redirect
+// In static mode, this creates a meta refresh redirect
+return Astro.redirect('/en/', 301);
 ---
