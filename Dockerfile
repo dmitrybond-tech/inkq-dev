@@ -1,57 +1,48 @@
-# Frontend Dockerfile - Two-stage build
-# Builder stage
-FROM node:22-slim AS builder
+# === Builder stage ===
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files (package-lock.json is optional with * pattern)
+# Copy package files
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-# Use npm ci if package-lock.json is present (faster, reproducible); fallback to npm install for environments without a lockfile or if npm ci fails
-RUN set +e; \
-    if [ -f package-lock.json ]; then \
-      npm ci; \
-      if [ $? -ne 0 ]; then \
-        echo "npm ci failed, falling back to npm install"; \
-        npm install; \
-      fi; \
-    else \
-      npm install; \
-    fi; \
-    set -e
+RUN npm ci || npm install
 
 # Build arguments (set before copying source for better caching)
 ARG PUBLIC_API_BASE_URL=
-ARG ASTRO_OUTPUT_MODE=server
 
 # Set environment variables for Astro build
 ENV PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
-ENV ASTRO_OUTPUT_MODE=${ASTRO_OUTPUT_MODE}
-ENV NODE_ENV=production
-
-# Copy frontend source
-COPY . .
-
-# Build the Astro app (SSR mode)
-RUN npm run build
-
-# Runtime stage
-FROM node:22-slim
-
-WORKDIR /app
-
-# Set production environment
 ENV NODE_ENV=production
 ENV PORT=4173
 
-# Copy built files from builder (includes dist/server/entry.mjs for SSR)
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./package.json
+# Copy the rest of the frontend source
+COPY . .
 
-# Expose port 4173
+# Build Astro in server (SSR) mode
+RUN npm run build
+
+# === Runtime stage ===
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=4173
+
+# Copy built SSR assets
+COPY --from=builder /app/dist ./dist
+
+# Copy package files so we can install only runtime deps if needed
+COPY package.json package-lock.json* ./
+
+# Install production dependencies only (omit devDeps)
+RUN npm ci --omit=dev || npm install --omit=dev
+
+# Expose the port Astro will listen on
 EXPOSE 4173
 
-# Start Node SSR server
+# Start the Astro SSR server
 CMD ["node", "dist/server/entry.mjs"]
 
