@@ -45,6 +45,9 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/inkq-${{ matrix.service }}:preprod
             ghcr.io/${{ github.repository_owner }}/inkq-${{ matrix.service }}:${{ github.sha }}
+          build-args: |
+            ${{ matrix.service == 'frontend' && 'PUBLIC_API_BASE_URL=https://inkq-preprod.dmitrybond.tech/api' || '' }}
+            ${{ matrix.service == 'frontend' && 'ASTRO_OUTPUT_MODE=server' || '' }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/inkq-${{ matrix.service }}:preprod
           cache-to: type=inline
 
