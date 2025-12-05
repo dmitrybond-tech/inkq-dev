@@ -1,5 +1,16 @@
 ---
-// Redirect root to /en/ with immediate redirect
-// In static mode, this creates a meta refresh redirect
-return Astro.redirect('/en/', 301);
+import PublicLayout from '../layouts/PublicLayout.astro';
+import LandingHero from '../components/LandingHero.astro';
+import { defaultLang, getTranslations } from '../i18n/index';
+
+// Explicitly enable prerendering for static builds
+export const prerender = true;
+
+const lang = defaultLang;
+const t = getTranslations(lang);
+const currentPath = Astro.url.pathname; // should be '/'
 ---
+
+<PublicLayout title={t.common.appName} lang={lang} t={t} currentPath={currentPath}>
+  <LandingHero lang={lang} t={t} />
+</PublicLayout>
