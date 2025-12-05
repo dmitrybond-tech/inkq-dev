@@ -111,7 +111,25 @@ Once running:
 - **Backend API**: http://localhost:8000
 - **Database**: localhost:5434 (user: `inkq_preprod`, database: `inkq_preprod`)
 
-The frontend is configured to call the backend via `/api` path (relative URL), which will be reverse-proxied by Caddy in production.
+### API URL Configuration
+
+The frontend uses environment variables to determine the backend API URL:
+
+**Development** (`.env`):
+```env
+INKQ_API_URL=http://localhost:8000
+PUBLIC_API_BASE_URL=
+```
+
+**Preprod** (Docker):
+- `PUBLIC_API_BASE_URL=""` (empty string) - set in `docker-compose.preprod.yml` or as build arg
+- Frontend uses relative paths like `/api/v1/...` which Caddy reverse-proxies to the backend
+
+The frontend constructs API URLs as: `${getApiUrl()}/api/v1/...`
+- In dev: `http://localhost:8000/api/v1/...`
+- In preprod: `/api/v1/...` (relative, proxied by Caddy)
+
+See `API_INTEGRATION_CHECKLIST.md` for detailed verification steps.
 
 ### Troubleshooting
 

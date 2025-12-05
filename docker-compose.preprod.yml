@@ -43,6 +43,8 @@ services:
   frontend:
     image: ghcr.io/dmitrybond-tech/inkq-frontend:preprod
     container_name: inkq_preprod_frontend
+    environment:
+      PUBLIC_API_BASE_URL: ""
     ports:
       - "4173:4173"
     depends_on:
