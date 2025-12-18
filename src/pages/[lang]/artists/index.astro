@@ -2,7 +2,6 @@
 import PublicLayout from '../../../layouts/PublicLayout.astro';
 import { resolveLangFromParams, getTranslations, supportedLangs } from '../../../i18n/index';
 import type { Lang, I18nSchema } from '../../../i18n/types';
-import { callBackendJsonParse } from '../../../shared/api/client';
 
 export const prerender = false;
 
@@ -69,15 +68,35 @@ let filters: PublicArtistFiltersResponse | null = null;
 let catalog: PublicArtistListResponse | null = null;
 let loadError: string | null = null;
 
+// Build absolute URLs for SSR-safe fetches using Astro.url as the base.
+const filtersUrl = new URL('/api/v1/public/artists/filters', Astro.url).toString();
+const catalogUrl = new URL(
+  `/api/v1/public/artists?city=${encodeURIComponent(cityParam)}&styles=${encodeURIComponent(
+    stylesParam
+  )}&limit=${limit}&offset=${offset}`,
+  Astro.url
+).toString();
+
 try {
-  [filters, catalog] = await Promise.all([
-    callBackendJsonParse<PublicArtistFiltersResponse>('/api/v1/public/artists/filters'),
-    callBackendJsonParse<PublicArtistListResponse>(
-      `/api/v1/public/artists?city=${encodeURIComponent(cityParam)}&styles=${encodeURIComponent(
-        stylesParam
-      )}&limit=${limit}&offset=${offset}`
-    ),
-  ]);
+  // Load catalog; this controls whether the page is considered failed.
+  const catalogResponse = await fetch(catalogUrl);
+  if (!catalogResponse.ok) {
+    throw new Error('Failed to load artists');
+  }
+  catalog = (await catalogResponse.json()) as PublicArtistListResponse;
+
+  // Load filters separately; failure here should not break the catalog list.
+  try {
+    const filtersResponse = await fetch(filtersUrl);
+    if (filtersResponse.ok) {
+      filters = (await filtersResponse.json()) as PublicArtistFiltersResponse;
+    } else {
+      // Swallow filters errors and fall back to empty filters UI.
+      filters = null;
+    }
+  } catch {
+    filters = null;
+  }
 } catch (error: any) {
   loadError = error?.message || 'Failed to load artists';
 }

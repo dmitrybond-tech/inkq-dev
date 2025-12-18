@@ -1,7 +1,6 @@
 ---
 import PublicLayout from '../../layouts/PublicLayout.astro';
 import { resolveLangFromParams, getTranslations, supportedLangs } from '../../i18n/index';
-import { getApiUrl } from '../../shared/config';
 
 export async function getStaticPaths() {
   return supportedLangs.map((lang) => ({
@@ -12,7 +11,6 @@ export async function getStaticPaths() {
 const lang = resolveLangFromParams(Astro.params.lang);
 const t = getTranslations(lang);
 const currentPath = Astro.url.pathname;
-const apiUrl = getApiUrl();
 ---
 
 <PublicLayout title={t.common.signUp} lang={lang} t={t} currentPath={currentPath}>
@@ -28,9 +26,13 @@ const apiUrl = getApiUrl();
         <div
           id="signup-error"
           class="hidden mb-4 p-3 rounded-md bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm"
-        ></div>
+        >
+          {/* Client-side-only validation errors could be rendered here in the future.
+              Server-side errors are provided via the `error` query param from the
+              `/api/v1/auth/signup` Astro API route. */}
+        </div>
       )}
-      <form id="signup-form" method="POST" action="/api/v1/auth/signup" class="space-y-4">
+      <form method="POST" action="/api/v1/auth/signup" class="space-y-4">
         <div>
           <label for="email" class="block text-sm font-medium mb-2 text-[var(--inkq-fg)]">
             {t.auth.emailLabel}
@@ -104,120 +106,3 @@ const apiUrl = getApiUrl();
     </div>
   </div>
 </PublicLayout>
-
-<script define:vars={{ apiUrl, lang }}>
-  document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('signup-form');
-    const errorEl = document.getElementById('signup-error');
-
-    if (!form) {
-      return;
-    }
-
-    function showError(message) {
-      if (!errorEl) return;
-      errorEl.textContent = message || 'Signup failed. Please try again.';
-      errorEl.classList.remove('hidden');
-    }
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      if (errorEl) {
-        errorEl.textContent = '';
-        errorEl.classList.add('hidden');
-      }
-
-      const formData = new FormData(form);
-      const email = formData.get('email');
-      const username = formData.get('username');
-      const password = formData.get('password');
-      const accountType = formData.get('accountType');
-
-      if (
-        typeof email !== 'string' ||
-        typeof username !== 'string' ||
-        typeof password !== 'string' ||
-        typeof accountType !== 'string'
-      ) {
-        showError('Please fill in all fields.');
-        return;
-      }
-
-      const signupPayload = {
-        email,
-        username,
-        password,
-        account_type: accountType,
-      };
-
-      try {
-        // First, create the user
-        const signupResponse = await fetch(`${apiUrl}/api/v1/auth/signup`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(signupPayload),
-        });
-
-        const signupData = await signupResponse.json().catch(() => null);
-
-        if (!signupResponse.ok) {
-          if (signupData && signupData.detail) {
-            showError(typeof signupData.detail === 'string' ? signupData.detail : 'Signup failed.');
-          } else {
-            showError('Signup failed. Please try again.');
-          }
-          return;
-        }
-
-        if (!signupData || !signupData.email || !signupData.username || !signupData.account_type) {
-          showError('Unexpected response from server.');
-          return;
-        }
-
-        const createdUser = signupData;
-
-        // Then, sign in to obtain a session token
-        const signinResponse = await fetch(`${apiUrl}/api/v1/auth/signin`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            login: email,
-            password,
-          }),
-        });
-
-        const signinData = await signinResponse.json().catch(() => null);
-
-        if (!signinResponse.ok || !signinData || !signinData.access_token || !signinData.user) {
-          showError('Signup succeeded but automatic signin failed. Please try signing in.');
-          return;
-        }
-
-        const token = signinData.access_token;
-        const user = signinData.user;
-
-        // Set session cookie for middleware and other frontend logic
-        document.cookie = `inkq_session=${encodeURIComponent(token)}; path=/`;
-
-        let redirectPath;
-        if (!user.onboarding_completed) {
-          redirectPath = `/${lang}/onboarding/${user.account_type}`;
-        } else {
-          redirectPath = `/${lang}/dashboard/${user.account_type}`;
-        }
-
-        window.location.href = redirectPath;
-      } catch (err) {
-        showError('Signup failed. Please check your connection and try again.');
-      }
-    });
-  });
-</script>
-
