@@ -72,6 +72,10 @@ async function resolveUser(token: string): Promise<User | null> {
       },
     });
 
+    if (!import.meta.env.PROD) {
+      console.info(`[dev][middleware] /api/v1/auth/me status: ${response.status}`);
+    }
+
     if (response.ok) {
       return await response.json();
     }
@@ -94,6 +98,10 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const lang = extractLang(pathname);
   const cookieName = 'inkq_session';
   const token = cookies.get(cookieName)?.value;
+
+  if (!import.meta.env.PROD) {
+    console.info(`[dev][middleware] cookie "${cookieName}" present: ${token ? 'yes' : 'no'}`);
+  }
 
   // Resolve user if token exists
   let user: User | null = null;

@@ -41,6 +41,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     const cookieName = 'inkq_session';
     const token = cookies.get(cookieName)?.value;
 
+    if (!import.meta.env.PROD) {
+      console.info(`[dev][signout] cookie present before signout: ${token ? 'yes' : 'no'}`);
+    }
+
     // If token exists, call backend signout
     if (token) {
       try {
@@ -60,6 +64,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     cookies.delete(cookieName, {
       path: '/',
     });
+
+    if (!import.meta.env.PROD) {
+      console.info('[dev][signout] cookie cleared: yes');
+    }
 
     // Redirect to localized public page (home)
     const redirectPath = `/${lang}`;

@@ -40,6 +40,16 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     const username = (body.username ?? '').toString().trim();
     const account_type_raw = (body.accountType ?? body.account_type ?? '').toString().trim();
 
+    if (!import.meta.env.PROD) {
+      const hasEmail = !!email;
+      const hasPassword = !!password;
+      const hasUsername = !!username;
+      const hasAccountType = !!account_type_raw;
+      console.info(
+        `[dev][signup] content-type="${contentType}", email present=${hasEmail}, password present=${hasPassword}, username present=${hasUsername}, account_type present=${hasAccountType}`
+      );
+    }
+
     // Validate required fields (defensive)
     if (!email || !password || !username || !account_type_raw) {
       // Extract language from Referer header or default to 'en'

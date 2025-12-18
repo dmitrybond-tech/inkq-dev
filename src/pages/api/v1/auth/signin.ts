@@ -31,6 +31,14 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     const loginValue = (body.login ?? body.email ?? '').toString().trim();
     const passwordValue = (body.password ?? '').toString().trim();
 
+    if (!import.meta.env.PROD) {
+      const hasLogin = !!loginValue;
+      const hasPassword = !!passwordValue;
+      console.info(
+        `[dev][signin] content-type="${contentType}", parsed login present=${hasLogin}, password present=${hasPassword}`
+      );
+    }
+
     // Defensive validation: required fields must be present
     if (!loginValue || !passwordValue) {
       if (!import.meta.env.PROD) {
@@ -78,6 +86,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
       path: '/',
       maxAge: maxAge,
     });
+
+    if (!import.meta.env.PROD) {
+      console.info('[dev][signin] cookie set: yes');
+    }
 
     // Extract language from Referer header or default to 'en'
     const referer = request.headers.get('referer') || '';
