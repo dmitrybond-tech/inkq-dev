@@ -28,28 +28,42 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     } else {
       const formData = await request.formData();
       body = {
-        email: formData.get('email') as string,
-        password: formData.get('password') as string,
-        username: formData.get('username') as string,
-        accountType: formData.get('accountType') as string,
+        email: formData.get('email') as string | null | undefined,
+        password: formData.get('password') as string | null | undefined,
+        username: formData.get('username') as string | null | undefined,
+        accountType: formData.get('accountType') as string | null | undefined,
       };
     }
 
-    // Validate required fields
-    if (!body.email || !body.password || !body.username || (!body.accountType && !body.account_type)) {
-      return new Response(
-        JSON.stringify({ detail: 'Missing required fields' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    const email = (body.email ?? '').toString().trim();
+    const password = (body.password ?? '').toString().trim();
+    const username = (body.username ?? '').toString().trim();
+    const account_type_raw = (body.accountType ?? body.account_type ?? '').toString().trim();
+
+    // Validate required fields (defensive)
+    if (!email || !password || !username || !account_type_raw) {
+      // Extract language from Referer header or default to 'en'
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      const redirectUrl = new URL(`/${lang}/signup`, url.origin);
+      redirectUrl.searchParams.set('error', 'All fields are required');
+
+      return Response.redirect(redirectUrl, 302);
     }
 
     // Normalize account_type
-    const account_type = body.accountType || body.account_type;
+    const account_type = account_type_raw;
     if (!['artist', 'studio', 'model'].includes(account_type)) {
-      return new Response(
-        JSON.stringify({ detail: 'Invalid account_type' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      const redirectUrl = new URL(`/${lang}/signup`, url.origin);
+      redirectUrl.searchParams.set('error', 'Invalid account type');
+
+      return Response.redirect(redirectUrl, 302);
     }
 
     // Call backend signup
@@ -62,10 +76,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     }>('/api/v1/auth/signup', {
       method: 'POST',
       body: JSON.stringify({
-        email: body.email,
-        password: body.password,
-        username: body.username,
-        account_type: account_type,
+        email,
+        password,
+        username,
+        account_type,
       }),
     });
 
@@ -82,8 +96,8 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     }>('/api/v1/auth/signin', {
       method: 'POST',
       body: JSON.stringify({
-        login: body.email,
-        password: body.password,
+        login: email,
+        password,
       }),
     });
 

@@ -15,36 +15,37 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
   try {
     // Parse form data or JSON
     const contentType = request.headers.get('content-type') || '';
-    let body: { login?: string; email?: string; password: string };
-    
+    let body: { login?: string; email?: string; password?: string };
+
     if (contentType.includes('application/json')) {
       body = await request.json();
     } else {
       const formData = await request.formData();
       body = {
-        login: formData.get('login') as string || formData.get('email') as string,
-        password: formData.get('password') as string,
+        login: (formData.get('login') ?? formData.get('email')) as string | null | undefined,
+        email: formData.get('email') as string | null | undefined,
+        password: formData.get('password') as string | null | undefined,
       };
     }
 
-    if (!body.login && !body.email) {
-      if (!import.meta.env.PROD) {
-        console.warn('[signin] missing login/email in form data');
-      }
-      return new Response(
-        JSON.stringify({ detail: 'Login (email or username) is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const loginValue = (body.login ?? body.email ?? '').toString().trim();
+    const passwordValue = (body.password ?? '').toString().trim();
 
-    if (!body.password) {
+    // Defensive validation: required fields must be present
+    if (!loginValue || !passwordValue) {
       if (!import.meta.env.PROD) {
-        console.warn('[signin] missing password in form data');
+        console.warn('[signin] missing login/email or password in request body');
       }
-      return new Response(
-        JSON.stringify({ detail: 'Password is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+
+      // Extract language from Referer header or default to 'en'
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      const redirectUrl = new URL(`/${lang}/signin`, url.origin);
+      redirectUrl.searchParams.set('error', 'Login and password are required');
+
+      return Response.redirect(redirectUrl, 302);
     }
 
     // Call backend
@@ -60,8 +61,8 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     }>('/api/v1/auth/signin', {
       method: 'POST',
       body: JSON.stringify({
-        login: body.login || body.email,
-        password: body.password,
+        login: loginValue,
+        password: passwordValue,
       }),
     });
 
