@@ -1,7 +1,15 @@
 import type { APIRoute } from 'astro';
-import { callBackendJson } from '../../shared/api/client';
+import { getApiUrl } from '../../shared/config';
 
 export const prerender = false;
+
+function resolveBackendUrl(path: string, url: URL): string {
+  const apiBase = getApiUrl();
+  if (apiBase) {
+    return `${apiBase}${path}`;
+  }
+  return new URL(path, url.origin).toString();
+}
 
 export const POST: APIRoute = async ({ request, cookies, url }) => {
   // Only accept POST
@@ -40,12 +48,25 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     // If token exists, call backend signout (best-effort; ignore failures)
     if (token) {
       try {
-        await callBackendJson('/api/v1/auth/signout', {
+        const signoutUrl = resolveBackendUrl('/api/v1/auth/signout', url);
+        const resp = await fetch(signoutUrl, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
         });
+        const text = await resp.text();
+        if (!import.meta.env.PROD) {
+          console.info(
+            '[dev][signout] backend signout response',
+            JSON.stringify({
+              url: signoutUrl,
+              status: resp.status,
+              textPreview: text.slice(0, 200),
+            })
+          );
+        }
       } catch (error) {
         // Even if backend call fails, clear the cookie
         if (!import.meta.env.PROD) {

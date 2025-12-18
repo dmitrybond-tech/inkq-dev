@@ -1,7 +1,15 @@
 import type { APIRoute } from 'astro';
-import { callBackendJsonParse } from '../../shared/api/client';
+import { getApiUrl } from '../../shared/config';
 
 export const prerender = false;
+
+function resolveBackendUrl(path: string, url: URL): string {
+  const apiBase = getApiUrl();
+  if (apiBase) {
+    return `${apiBase}${path}`;
+  }
+  return new URL(path, url.origin).toString();
+}
 
 export const POST: APIRoute = async ({ request, cookies, url }) => {
   // Only accept POST
@@ -76,15 +84,13 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
       return Response.redirect(redirectUrl, 302);
     }
 
-    // Call backend signup
-    const userData = await callBackendJsonParse<{
-      id: number;
-      email: string;
-      username: string;
-      account_type: string;
-      onboarding_completed: boolean;
-    }>('/api/v1/auth/signup', {
+    const signupUrl = resolveBackendUrl('/api/v1/auth/signup', url);
+
+    const signupResp = await fetch(signupUrl, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         email,
         password,
@@ -93,23 +99,111 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
       }),
     });
 
+    const signupText = await signupResp.text();
+    let signupData: any = null;
+    try {
+      signupData = signupText ? JSON.parse(signupText) : null;
+    } catch {
+      // Non-JSON response, keep data as null
+    }
+
+    if (!import.meta.env.PROD) {
+      console.info(
+        '[dev][signup] backend signup response',
+        JSON.stringify({
+          url: signupUrl,
+          status: signupResp.status,
+          textPreview: signupText.slice(0, 200),
+        })
+      );
+    }
+
+    if (!signupResp.ok) {
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      let detail = 'Server error';
+
+      if (signupResp.status === 422) {
+        const d = signupData && typeof signupData === 'object' ? (signupData as any) : null;
+        if (d?.detail) {
+          if (typeof d.detail === 'string') {
+            detail = d.detail;
+          } else {
+            detail = 'Validation error';
+          }
+        } else {
+          detail = 'Validation error';
+        }
+      } else if (signupResp.status === 409) {
+        detail = 'Email or username already exists';
+      }
+
+      const redirectUrl = new URL(`/${lang}/signup`, url.origin);
+      redirectUrl.searchParams.set('error', detail);
+      return Response.redirect(redirectUrl, 302);
+    }
+
     // After successful signup, sign in the user
-    const signinData = await callBackendJsonParse<{
-      access_token: string;
-      user: {
-        id: number;
-        email: string;
-        username: string;
-        account_type: string;
-        onboarding_completed: boolean;
-      };
-    }>('/api/v1/auth/signin', {
+    const signinUrl = resolveBackendUrl('/api/v1/auth/signin', url);
+
+    const signinResp = await fetch(signinUrl, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         login: email,
         password,
       }),
     });
+
+    const signinText = await signinResp.text();
+    let signinData: any = null;
+    try {
+      signinData = signinText ? JSON.parse(signinText) : null;
+    } catch {
+      // Non-JSON response, keep data as null
+    }
+
+    if (!import.meta.env.PROD) {
+      console.info(
+        '[dev][signup] backend signin response',
+        JSON.stringify({
+          url: signinUrl,
+          status: signinResp.status,
+          textPreview: signinText.slice(0, 200),
+        })
+      );
+    }
+
+    if (!signinResp.ok || !signinData || !signinData.access_token || !signinData.user) {
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      let detail = 'Server error';
+
+      if (signinResp.status === 401) {
+        detail = 'Invalid login or password';
+      } else if (signinResp.status === 422) {
+        const d = signinData && typeof signinData === 'object' ? (signinData as any) : null;
+        if (d?.detail) {
+          if (typeof d.detail === 'string') {
+            detail = d.detail;
+          } else {
+            detail = 'Validation error';
+          }
+        } else {
+          detail = 'Validation error';
+        }
+      }
+
+      const redirectUrl = new URL(`/${lang}/signin`, url.origin);
+      redirectUrl.searchParams.set('error', detail);
+      return Response.redirect(redirectUrl, 302);
+    }
 
     // Set cookie
     const cookieName = 'inkq_session';
@@ -140,28 +234,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     // Return redirect response
     return Response.redirect(new URL(redirectPath, url.origin), 302);
   } catch (error: any) {
-    // Handle errors
-    const errorMessage = error.message || 'An error occurred during signup';
-    
-    // Map common error messages
-    let status = 500;
-    let detail = 'Server error';
-    
-    if (errorMessage.includes('already exists')) {
-      status = 400;
-      detail = 'Email or username already exists';
-    } else if (errorMessage.includes('Invalid account_type')) {
-      status = 400;
-      detail = 'Invalid account type';
-    } else if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
-      status = 400;
-      detail = errorMessage;
-    } else if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
-      status = 409;
-      detail = 'Email or username already exists';
-    } else if (errorMessage.includes('422') || errorMessage.includes('Unprocessable')) {
-      status = 422;
-      detail = 'Validation error';
+    if (!import.meta.env.PROD) {
+      console.error('[dev][signup] unexpected error', {
+        message: error?.message,
+      });
     }
 
     // Extract language from Referer header or default to 'en'
@@ -171,7 +247,7 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
 
     // Redirect back to signup with error
     const redirectUrl = new URL(`/${lang}/signup`, url.origin);
-    redirectUrl.searchParams.set('error', detail);
+    redirectUrl.searchParams.set('error', 'Server error');
     
     return Response.redirect(redirectUrl, 302);
   }

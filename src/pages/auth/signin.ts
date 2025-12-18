@@ -1,7 +1,15 @@
 import type { APIRoute } from 'astro';
-import { callBackendJsonParse } from '../../shared/api/client';
+import { getApiUrl } from '../../shared/config';
 
 export const prerender = false;
+
+function resolveBackendUrl(path: string, url: URL): string {
+  const apiBase = getApiUrl();
+  if (apiBase) {
+    return `${apiBase}${path}`;
+  }
+  return new URL(path, url.origin).toString();
+}
 
 export const POST: APIRoute = async ({ request, cookies, url }) => {
   // Only accept POST
@@ -56,23 +64,81 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
       return Response.redirect(redirectUrl, 302);
     }
 
-    // Call backend
-    const data = await callBackendJsonParse<{
-      access_token: string;
-      user: {
-        id: number;
-        email: string;
-        username: string;
-        account_type: string;
-        onboarding_completed: boolean;
-      };
-    }>('/api/v1/auth/signin', {
+    const backendUrl = resolveBackendUrl('/api/v1/auth/signin', url);
+
+    const resp = await fetch(backendUrl, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         login: loginValue,
         password: passwordValue,
       }),
     });
+
+    const text = await resp.text();
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      // Non-JSON response, keep data as null
+    }
+
+    if (!import.meta.env.PROD) {
+      console.info(
+        '[dev][signin] backend response',
+        JSON.stringify({
+          url: backendUrl,
+          status: resp.status,
+          // Truncate text to avoid noisy logs; do not log credentials or tokens
+          textPreview: text.slice(0, 200),
+        })
+      );
+    }
+
+    if (!resp.ok) {
+      // Extract language from Referer header or default to 'en'
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      let detail = 'Server error';
+
+      if (resp.status === 401) {
+        detail = 'Invalid login or password';
+      } else if (resp.status === 422) {
+        const d = data && typeof data === 'object' ? (data as any) : null;
+        if (d?.detail) {
+          if (typeof d.detail === 'string') {
+            detail = d.detail;
+          } else {
+            detail = 'Validation error';
+          }
+        } else {
+          detail = 'Validation error';
+        }
+      }
+
+      const redirectUrl = new URL(`/${lang}/signin`, url.origin);
+      redirectUrl.searchParams.set('error', detail);
+      return Response.redirect(redirectUrl, 302);
+    }
+
+    if (!data || !data.access_token || !data.user) {
+      if (!import.meta.env.PROD) {
+        console.error('[dev][signin] missing access_token or user in backend response');
+      }
+
+      // Extract language from Referer header or default to 'en'
+      const referer = request.headers.get('referer') || '';
+      const langMatch = referer.match(/\/(en|ru)\//);
+      const lang = langMatch ? langMatch[1] : 'en';
+
+      const redirectUrl = new URL(`/${lang}/signin`, url.origin);
+      redirectUrl.searchParams.set('error', 'Server error');
+      return Response.redirect(redirectUrl, 302);
+    }
 
     // Set cookie
     const cookieName = 'inkq_session';
@@ -107,25 +173,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     // Return redirect response
     return Response.redirect(new URL(redirectPath, url.origin), 302);
   } catch (error: any) {
-    // Handle errors
-    const errorMessage = error.message || 'An error occurred during signin';
-    
-    // Map common error messages
-    let status = 500;
-    let detail = 'Server error';
-    
-    if (errorMessage.includes('invalid_credentials')) {
-      status = 401;
-      detail = 'Invalid login or password';
-    } else if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
-      status = 400;
-      detail = errorMessage;
-    } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-      status = 401;
-      detail = 'Invalid login or password';
-    } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-      status = 403;
-      detail = 'Access denied';
+    if (!import.meta.env.PROD) {
+      console.error('[dev][signin] unexpected error', {
+        message: error?.message,
+      });
     }
 
     // Extract language from Referer header or default to 'en'
@@ -135,7 +186,7 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
 
     // Redirect back to signin with error
     const redirectUrl = new URL(`/${lang}/signin`, url.origin);
-    redirectUrl.searchParams.set('error', detail);
+    redirectUrl.searchParams.set('error', 'Server error');
     
     return Response.redirect(redirectUrl, 302);
   }
