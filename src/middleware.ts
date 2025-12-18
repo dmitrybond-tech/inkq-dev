@@ -61,28 +61,75 @@ function extractLang(pathname: string): string {
 }
 
 /**
- * Resolve current user from session cookie
+ * Resolve backend URL for middleware calls.
+ * Mirrors the logic used in the auth/signin API route:
+ * - Prefer explicit backend base from `getApiUrl()`
+ * - Fallback to same-origin absolute URL when base is empty (preprod/prod behind reverse proxy)
  */
-async function resolveUser(token: string): Promise<User | null> {
+function resolveBackendUrl(path: string, url: URL): string {
+  const apiBase = getApiUrl();
+  if (apiBase) {
+    return `${apiBase}${path}`;
+  }
+  return new URL(path, url.origin).toString();
+}
+
+interface ResolveUserResult {
+  user: User | null;
+  status: number | null;
+  timedOut: boolean;
+}
+
+/**
+ * Resolve current user from session cookie in an SSR-safe, deterministic way.
+ * - Always calls `/api/v1/auth/me` with `Authorization: Bearer <token>`
+ * - Uses an AbortController-based timeout to avoid hanging requests
+ */
+async function resolveUser(token: string, url: URL): Promise<ResolveUserResult> {
+  const controller = new AbortController();
+  const timeoutMs = 4000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const apiUrl = getApiUrl();
-    const response = await fetch(`${apiUrl}/api/v1/auth/me`, {
+    const meUrl = resolveBackendUrl('/api/v1/auth/me', url);
+    const response = await fetch(meUrl, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
+      signal: controller.signal,
     });
 
     if (!import.meta.env.PROD) {
-      console.info(`[dev][middleware] /api/v1/auth/me status: ${response.status}`);
+      console.info(
+        `[dev][middleware] /api/v1/auth/me`,
+        JSON.stringify({
+          url: meUrl,
+          status: response.status,
+        })
+      );
     }
 
     if (response.ok) {
-      return await response.json();
+      const user = (await response.json()) as User;
+      return { user, status: response.status, timedOut: false };
     }
-    return null;
-  } catch (error) {
-    console.error('Error resolving user:', error);
-    return null;
+
+    return { user: null, status: response.status, timedOut: false };
+  } catch (error: any) {
+    const timedOut = error?.name === 'AbortError';
+    if (!import.meta.env.PROD) {
+      console.error(
+        '[dev][middleware] error resolving user',
+        JSON.stringify({
+          message: error?.message,
+          name: error?.name,
+          timedOut,
+        })
+      );
+    }
+    return { user: null, status: null, timedOut };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -99,19 +146,38 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const cookieName = 'inkq_session';
   const token = cookies.get(cookieName)?.value;
 
+   // Track auth resolution metadata for loop-breaking logic and dev observability
+  const hadCookie = !!token;
+  let meStatus: number | null = null;
+  let meTimedOut = false;
+  let clearedCookie = false;
+
   if (!import.meta.env.PROD) {
-    console.info(`[dev][middleware] cookie "${cookieName}" present: ${token ? 'yes' : 'no'}`);
+    console.info(
+      `[dev][middleware] incoming request`,
+      JSON.stringify({
+        path: pathname,
+        cookieName,
+        cookiePresent: hadCookie ? 'yes' : 'no',
+      })
+    );
   }
 
   // Resolve user if token exists
   let user: User | null = null;
   if (token) {
-    user = await resolveUser(token);
+    const result = await resolveUser(token, url);
+    user = result.user;
+    meStatus = result.status;
+    meTimedOut = result.timedOut;
 
-    // If token is invalid, clear the cookie
-    if (!user) {
+    // If backend explicitly says the token is invalid/expired, clear cookie immediately
+    if (!user && (meStatus === 401 || meStatus === 403)) {
       cookies.delete(cookieName, { path: '/' });
-    } else {
+      clearedCookie = true;
+    }
+
+    if (user) {
       // Store user and session token in locals for use in pages
       // Keep existing `locals.user` for current pages and also expose `locals.currentUser` for layout/components.
       context.locals.user = user;
@@ -124,6 +190,21 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     }
   }
 
+  // Small helper to annotate responses in development so we can debug auth behaviour
+  function withDevAuthHeader(response: Response): Response {
+    if (!import.meta.env.PROD) {
+      const parts = [
+        `path=${pathname}`,
+        `cookie=${hadCookie ? 'yes' : 'no'}`,
+        `me_status=${meStatus ?? 'none'}`,
+        `me_timeout=${meTimedOut ? 'yes' : 'no'}`,
+        `cleared=${clearedCookie ? 'yes' : 'no'}`,
+      ];
+      response.headers.set('X-InkQ-Auth', parts.join('; '));
+    }
+    return response;
+  }
+
   // Handle public paths
   if (isPublicPath(pathname)) {
     // If user is authenticated and trying to access signin/signup, redirect to dashboard/onboarding
@@ -134,24 +215,34 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       } else {
         redirectPath = `/${lang}/dashboard/${user.account_type}`;
       }
-      return redirect(redirectPath, 302);
+      return withDevAuthHeader(redirect(redirectPath, 302));
     }
     // Otherwise allow access
-    return next();
+    const response = await next();
+    return withDevAuthHeader(response);
   }
 
   // Handle protected paths
   if (isProtectedPath(pathname)) {
-    // If not authenticated, redirect to signin
+    // If not authenticated, redirect to signin.
+    // Loop-breaker: if we HAD a cookie but /me said 401/403, treat as "session expired"
     if (!user) {
-      return redirect(`/${lang}/signin?reason=auth_required`, 302);
+      const urlSearch = new URLSearchParams();
+      if (hadCookie && (meStatus === 401 || meStatus === 403)) {
+        urlSearch.set('error', 'Session expired');
+      } else {
+        urlSearch.set('reason', 'auth_required');
+      }
+      const redirectTarget = `/${lang}/signin?${urlSearch.toString()}`;
+      return withDevAuthHeader(redirect(redirectTarget, 302));
     }
 
     // Handle onboarding paths
     if (pathname.startsWith(`/${lang}/onboarding`)) {
       // Option A: Allow access even if onboarding is completed (user can revisit)
       // This is the MVP approach - we allow it
-      return next();
+      const response = await next();
+      return withDevAuthHeader(response);
     }
 
     // Handle dashboard paths
@@ -166,15 +257,17 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       if (roleMatch) {
         const urlRole = roleMatch[1];
         if (urlRole !== user.account_type) {
-          return redirect(`/${lang}/dashboard/${user.account_type}`, 302);
+          return withDevAuthHeader(redirect(`/${lang}/dashboard/${user.account_type}`, 302));
         }
       }
 
-      return next();
+      const response = await next();
+      return withDevAuthHeader(response);
     }
   }
 
   // Default: allow access
-  return next();
+  const response = await next();
+  return withDevAuthHeader(response);
 };
 
