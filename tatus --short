@@ -1,0 +1,149 @@
+[1mdiff --git a/src/pages/auth/signin.ts b/src/pages/auth/signin.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..7bc7dba[m
+[1m--- /dev/null[m
+[1m+++ b/src/pages/auth/signin.ts[m
+[36m@@ -0,0 +1,143 @@[m
+[32m+[m[32mimport type { APIRoute } from 'astro';[m
+[32m+[m[32mimport { callBackendJsonParse } from '../../shared/api/client';[m
+[32m+[m
+[32m+[m[32mexport const prerender = false;[m
+[32m+[m
+[32m+[m[32mexport const POST: APIRoute = async ({ request, cookies, url }) => {[m
+[32m+[m[32m  // Only accept POST[m
+[32m+[m[32m  if (request.method !== 'POST') {[m
+[32m+[m[32m    return new Response([m
+[32m+[m[32m      JSON.stringify({ detail: 'Method not allowed' }),[m
+[32m+[m[32m      { status: 405, headers: { 'Content-Type': 'application/json' } }[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    // Parse form data or JSON[m
+[32m+[m[32m    const contentType = request.headers.get('content-type') || '';[m
+[32m+[m[32m    let body: { login?: string; email?: string; password?: string };[m
+[32m+[m
+[32m+[m[32m    if (contentType.includes('application/json')) {[m
+[32m+[m[32m      body = await request.json();[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      const formData = await request.formData();[m
+[32m+[m[32m      body = {[m
+[32m+[m[32m        login: (formData.get('login') ?? formData.get('email')) as string | null | undefined,[m
+[32m+[m[32m        email: formData.get('email') as string | null | undefined,[m
+[32m+[m[32m        password: formData.get('password') as string | null | undefined,[m
+[32m+[m[32m      };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const loginValue = (body.login ?? body.email ?? '').toString().trim();[m
+[32m+[m[32m    const passwordValue = (body.password ?? '').toString().trim();[m
+[32m+[m
+[32m+[m[32m    if (!import.meta.env.PROD) {[m
+[32m+[m[32m      const hasLogin = !!loginValue;[m
+[32m+[m[32m      const hasPassword = !!passwordValue;[m
+[32m+[m[32m      console.info([m
+[32m+[m[32m        `[dev][signin] content-type="${contentType}", parsed login present=${hasLogin}, password present=${hasPassword}`[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Defensive validation: required fields must be present[m
+[32m+[m[32m    if (!loginValue || !passwordValue) {[m
+[32m+[m[32m      if (!import.meta.env.PROD) {[m
+[32m+[m[32m        console.warn('[signin] missing login/email or password in request body');[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Extract language from Referer header or default to 'en'[m
+[32m+[m[32m      const referer = request.headers.get('referer') || '';[m
+[32m+[m[32m      const langMatch = referer.match(/\/(en|ru)\//);[m
+[32m+[m[32m      const lang = langMatch ? langMatch[1] : 'en';[m
+[32m+[m
+[32m+[m[32m      const redirectUrl = new URL(`/${lang}/signin`, url.origin);[m
+[32m+[m[32m      redirectUrl.searchParams.set('error', 'Login and password are required');[m
+[32m+[m
+[32m+[m[32m      return Response.redirect(redirectUrl, 302);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Call backend[m
+[32m+[m[32m    const data = await callBackendJsonParse<{[m
+[32m+[m[32m      access_token: string;[m
+[32m+[m[32m      user: {[m
+[32m+[m[32m        id: number;[m
+[32m+[m[32m        email: string;[m
+[32m+[m[32m        username: string;[m
+[32m+[m[32m        account_type: string;[m
+[32m+[m[32m        onboarding_completed: boolean;[m
+[32m+[m[32m      };[m
+[32m+[m[32m    }>('/api/v1/auth/signin', {[m
+[32m+[m[32m      method: 'POST',[m
+[32m+[m[32m      body: JSON.stringify({[m
+[32m+[m[32m        login: loginValue,[m
+[32m+[m[32m        password: passwordValue,[m
+[32m+[m[32m      }),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    // Set cookie[m
+[32m+[m[32m    const cookieName = 'inkq_session';[m
+[32m+[m[32m    const isProduction = import.meta.env.PROD;[m
+[32m+[m[32m    const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds[m
+[32m+[m
+[32m+[m[32m    cookies.set(cookieName, data.access_token, {[m
+[32m+[m[32m      httpOnly: true,[m
+[32m+[m[32m      secure: isProduction,[m
+[32m+[m[32m      sameSite: 'lax',[m
+[32m+[m[32m      path: '/',[m
+[32m+[m[32m      maxAge: maxAge,[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    if (!import.meta.env.PROD) {[m
+[32m+[m[32m      console.info('[dev][signin] cookie set: yes');[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Extract language from Referer header or default to 'en'[m
+[32m+[m[32m    const referer = request.headers.get('referer') || '';[m
+[32m+[m[32m    const langMatch = referer.match(/\/(en|ru)\//);[m
+[32m+[m[32m    const lang = langMatch ? langMatch[1] : 'en';[m
+[32m+[m
+[32m+[m[32m    // Determine redirect target[m
+[32m+[m[32m    let redirectPath: string;[m
+[32m+[m[32m    if (!data.user.onboarding_completed) {[m
+[32m+[m[32m      redirectPath = `/${lang}/onboarding/${data.user.account_type}`;[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      redirectPath = `/${lang}/dashboard/${data.user.account_type}`;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Return redirect response[m
+[32m+[m[32m    return Response.redirect(new URL(redirectPath, url.origin), 302);[m
+[32m+[m[32m  } catch (error: any) {[m
+[32m+[m[32m    // Handle errors[m
+[32m+[m[32m    const errorMessage = error.message || 'An error occurred during signin';[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Map common error messages[m
+[32m+[m[32m    let status = 500;[m
+[32m+[m[32m    let detail = 'Server error';[m
+[32m+[m[41m    [m
+[32m+[m[32m    if (errorMessage.includes('invalid_credentials')) {[m
+[32m+[m[32m      status = 401;[m
+[32m+[m[32m      detail = 'Invalid login or password';[m
+[32m+[m[32m    } else if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {[m
+[32m+[m[32m      status = 400;[m
+[32m+[m[32m      detail = errorMessage;[m
+[32m+[m[32m    } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {[m
+[32m+[m[32m      status = 401;[m
+[32m+[m[32m      detail = 'Invalid login or password';[m
+[32m+[m[32m    } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {[m
+[32m+[m[32m      status = 403;[m
+[32m+[m[32m      detail = 'Access denied';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Extract language from Referer header or default to 'en'[m
+[32m+[m[32m    const referer = request.headers.get('referer') || '';[m
+[32m+[m[32m    const langMatch = referer.match(/\/(en|ru)\//);[m
+[32m+[m[32m    const lang = langMatch ? langMatch[1] : 'en';[m
+[32m+[m
+[32m+[m[32m    // Redirect back to signin with error[m
+[32m+[m[32m    const redirectUrl = new URL(`/${lang}/signin`, url.origin);[m
+[32m+[m[32m    redirectUrl.searchParams.set('error', detail);[m
+[32m+[m[41m    [m
+[32m+[m[32m    return Response.redirect(redirectUrl, 302);[m
+[32m+[m[32m  }[m
+[32m+[m[32m};[m
+[32m+[m
